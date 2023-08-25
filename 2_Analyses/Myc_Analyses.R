@@ -1,0 +1,1166 @@
+############################
+###### LOAD PACKAGES #######
+############################
+
+library(mgcv); 
+library(gridExtra); 
+library(betareg); 
+library(MASS); 
+library(lme4); 
+library(lmerTest); 
+library(lsmeans); 
+library(ggeffects); 
+library(spdep); 
+library(ggplot2); 
+library(ncf); 
+library(ape); 
+library(sjPlot); 
+library(gridExtra); 
+library(MuMIn);
+library(maps); 
+library(sf); 
+library(car);
+library(viridis);
+library(tidyverse)
+
+options(na.action = "na.fail")
+
+packageVersion(c("mgcv")) #‘1.8.41’
+packageVersion(c("gridExtra")) # ‘2.3’
+packageVersion(c("betareg")) # ‘3.1.4’
+packageVersion(c("MASS")) # ‘7.3.58.1’
+packageVersion(c("lme4")) # ‘1.1.31’
+packageVersion(c("lmerTest")) # ‘3.1.3’
+packageVersion(c("lsmeans")) # ‘2.30.0’
+packageVersion(c("ggeffects")) # ‘1.1.4’
+packageVersion(c("spdep")) # ‘1.2.7’
+packageVersion(c("ggplot2")) #'3.4.0'
+packageVersion(c("ncf")) # ‘1.3.2’
+packageVersion(c("ape")) # ‘5.6.2’
+packageVersion(c("sjPlot")) # ‘2.8.12’
+packageVersion(c("gridExtra")) # '2.3'
+packageVersion(c("MuMIn")) # ‘1.47.1’
+packageVersion(c("tidyverse")) #  ‘1.3.2’
+packageVersion(c("maps")) # ‘3.4.1’
+packageVersion(c("sf")) # ‘1.0.9’
+packageVersion(c("car")) # ‘3.1.1’
+packageVersion(c("viridis")) # ‘0.6.2’
+packageVersion(c("tidyverse")) # ‘1.3.2’
+
+############################
+###### LOAD FUNCTIONS ######
+############################
+
+#overdispersion function
+Check.disp <- function(mod,dat) {
+  N <- nrow(dat)
+  p <- length(coef(mod))
+  E1 <- resid(mod, type = "pearson")
+  Dispersion <- sum(E1^2)/ (N-p)
+  return(Dispersion)
+}
+
+#RAC function
+Spat.cor <- function(mod,dat, dist) {
+  coords <- cbind(dat$longitude, dat$latitude)
+  matrix.dist = as.matrix(dist(cbind(dat$longitude, dat$latitude)))
+  matrix.dist[1:10, 1:10]
+  matrix.dist.inv <- 1/matrix.dist
+  matrix.dist.inv[1:10, 1:10]
+  diag(matrix.dist.inv) <- 0
+  matrix.dist.inv[1:10, 1:10]
+  myDist = dist
+  rac <- autocov_dist(resid(mod), coords, nbs = myDist, type = "inverse", zero.policy = TRUE, style = "W", longlat = T)
+  return(rac)
+}
+
+#RAC function when locations repeat (shift latlon)
+Spat.cor.rep <- function(mod,dat, dist) {
+  coords <- cbind(dat$longitude, dat$latitude) + matrix(runif(2*nrow(dat), 0, 0.00001), nrow = nrow(dat), ncol = 2)
+  matrix.dist = as.matrix(dist(cbind(dat$longitude, dat$latitude)))
+  matrix.dist[1:10, 1:10]
+  matrix.dist.inv <- 1/matrix.dist
+  matrix.dist.inv[1:10, 1:10]
+  diag(matrix.dist.inv) <- 0
+  matrix.dist.inv[1:10, 1:10]
+  myDist = dist
+  rac <- autocov_dist(resid(mod), coords, nbs = myDist, type = "inverse", zero.policy = TRUE, style = "W", longlat = T)
+  return(rac)
+}
+
+############################
+######## LDG MODELS ########
+############################
+
+############################
+######## READ DATA #########
+############################
+
+dat <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
+  # extended data option: 
+  # dat <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
+  filter(!entity_class == "undetermined") %>%                                        
+  select(c("entity_ID","entity_class","sprich","latitude","longitude","geology", "area",  "CHELSA_annual_mean_Temp", "CHELSA_annual_Prec","elev_range",
+           "AM","EM","ORC","NM")) %>%
+  rename(temp = CHELSA_annual_mean_Temp, prec = CHELSA_annual_Prec) %>%
+  mutate(entity_class2 = case_when(geology == "dev" ~ "Oceanic",                      
+                                   geology == "nondev" ~ "Non-oceanic",
+                                   entity_class =="Mainland" ~ "Mainland")) %>%
+  select(-geology) %>%          
+  filter(area > 6) %>% # based on paper Patrick shared
+  mutate(abslatitude = abs(latitude)) %>%                                             
+  mutate(abslatitude = as.vector(abslatitude)) %>% 
+  mutate(elev_range = ifelse(elev_range==0,1, elev_range)) %>%                                   
+  mutate(elev_range = ifelse(is.na(elev_range),1, elev_range)) %>% 
+  #for models only; remove for figs:
+  mutate(area = as.vector(scale(log10((area)+.01))), 
+         temp = as.vector(scale(temp)), 
+         prec = as.vector(scale(log10((prec)+.01))),
+         elev_range = as.vector(scale(log10((elev_range)+.01)))) %>% 
+  #filter(!entity_class2 == "Non-oceanic") %>% 
+  drop_na()
+
+############################
+######## CREATE MAP ########
+############################
+
+# create a custom color scale
+colScale <- scale_colour_manual(values = c("darkseagreen3", "lightgrey", "cyan4"))
+fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey", "cyan4"))
+
+# read world data
+world <- map_data("world")
+
+dat.ml <- dat %>% filter(entity_class2 =="Mainland")
+dat.oi <- dat %>% filter(entity_class2 =="Oceanic")
+dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic")
+
+# write out
+png("figures/Landtype_map.jpg", width = 8, height = 5, units = 'in', res = 300)
+ggplot()+
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray88", alpha = 0.5) +
+  geom_point(data = dat.ml, 
+             aes(x = longitude, y = latitude, color = factor(entity_class2), fill = factor(entity_class2)),  
+             pch = 16, size = 2, alpha = 0.7) +
+  geom_point(data = dat.oi, 
+             aes(x = longitude, y = latitude, color = factor(entity_class2), fill = factor(entity_class2)),  
+             pch = 16, size = 2, alpha = 0.7) +
+  geom_point(data = dat.noi, 
+             aes(x = longitude, y = latitude, color = factor(entity_class2), fill = factor(entity_class2)),  
+             pch = 16, size = 2, alpha = 0.7) +
+  #scale_color_viridis(discrete=TRUE) +
+  colScale+
+  fillScale+
+  xlab("") + ylab ("") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5,size = 30)) +
+  coord_sf(ylim = c(-65, 85), xlim = c(-200, 200), expand = FALSE) +
+  theme(axis.line = element_blank(), axis.ticks = element_blank(), legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())#,
+#axis.text.y = element_blank(), axis.title.y = element_blank() #, 
+#panel.background = element_blank(), panel.border = element_blank(), panel.grid.major = element_blank(),
+#panel.grid.minor = element_blank(), plot.background = element_blank())
+dev.off()
+
+############################
+######## VAR CORR ##########
+############################
+
+corr.vars <- dat %>%
+  select(c("abslatitude","area","temp","prec","elev_range"))                              
+corr.mat <- as.matrix(cor(corr.vars))    
+
+############################
+######### LAND TYPE ########
+############################
+
+m1 <- glm.nb(sprich ~ entity_class2*abslatitude, data = dat) 
+rac <- Spat.cor(m1,dat,2000) 
+m1.rac <- glm.nb(sprich ~ entity_class2*abslatitude + rac , data = dat) 
+summary(m1.rac)
+
+# check assumptions
+par(mfrow = c(2,2))
+plot(m1.rac)
+Check.disp(m1.rac, dat)
+vif(m1.rac)
+
+# find simple slope by entity_class2:
+# default link logit
+emtrends(m1.rac, ~ entity_class2, var="abslatitude")
+
+############################
+########### PLOT ###########
+##### LAT BY LAND TYPE #####
+############################
+
+new.dat.ml <- with(dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Mainland", rac = mean(rac))
+new.dat.oi <- with(dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Oceanic", rac = mean(rac))
+new.dat.noi <- with(dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Non-oceanic", rac = mean(rac))
+new.dat <- rbind(new.dat.ml, new.dat.oi, new.dat.noi)
+
+pred.ml <- predict(m1.rac, newdata = new.dat.ml, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.dat.ml$abslatitude, entity_class2 = "Mainland")
+pred.oi <- predict(m1.rac,newdata = new.dat.oi, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.dat.oi$abslatitude, entity_class2 = "Oceanic")
+pred.noi <- predict(m1.rac,newdata = new.dat.noi, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.dat.noi$abslatitude, entity_class2 = "Non-oceanic")
+pred.all <- rbind(pred.ml, pred.oi, pred.noi) 
+
+# create a custom color scale
+colScale <- scale_colour_manual(values = c("darkseagreen3", "lightgrey","cyan4"))
+fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey","cyan4"))
+
+lat.landtype <- 
+ggplot(data = pred.all,aes(x = abslatitude, y = fit, color = entity_class2, fill = entity_class2))+
+  geom_line() +
+  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8) + 
+  #remove this for no point version:
+  geom_point(data = dat, mapping = aes(x = abslatitude, y = sprich, color = factor(entity_class2)), alpha = 0.5, size = 5)+ 
+  xlab("Absolute latitude") +
+  ylab("Species richness") +
+  theme_classic(base_size = 40)+
+  ylim(0,5500) +
+  colScale +
+  fillScale +
+  #theme(legend.position = 'top') +
+  theme(legend.justification=c(1,1), legend.position=c(1,1))+
+  guides(fill = FALSE) +
+  guides(color = guide_legend(title = "Land Type", override.aes = list(fill = NA, linetype = c(0, 0, 0))))+
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30))
+
+# with non-oceanic
+png("figures/Myc_LatbyLandType_3type.jpg", width = 10, height = 10, units = 'in', res = 300)
+lat.landtype
+dev.off()
+
+#################################
+########## NULL MODELS ##########
+#### (optional to test null) ####
+#################################
+
+#################################
+##### V1. ML/OCEANIC MODELS #####
+#################################
+
+mlis_ratio <- pred.oi$fit/pred.ml$fit
+mlis_ratio <- cbind(mlis_ratio, pred.ml$abslatitude) %>% as.data.frame()
+colnames(mlis_ratio) <- c("ratio", "abslatitude")
+
+lat.mlis_ratio <- 
+  ggplot(data = mlis_ratio, aes(x = abslatitude, y = ratio), color = "black", fill = "black")+
+  geom_line() +
+  xlab("Absolute latitude") +
+  ylab("island:mainland species richness") +
+  theme_classic(base_size = 40) +
+  ylim(0,1) 
+
+png("figures/Ratio_plot.jpg", width = 10, height = 10, units = 'in', res = 300)
+lat.mlis_ratio
+dev.off()
+
+#################################
+######## V2. NULL ISLAND ########
+#################################
+
+# predict at real zero
+# from above
+prop <- pred.oi[1,1]/pred.ml[1,1]
+#prop <- mean(pred.oi$fit)/mean(pred.ml$fit)
+
+null.dat <- dat %>% 
+  filter(entity_class2 == "Mainland") %>% 
+  mutate(sprich = prop*sprich) %>% 
+  mutate(entity_class2 = "Null") %>%
+  mutate(latitude=latitude+runif(length(latitude),0, 0.00001), longitude = longitude+runif(length(latitude),0, 0.00001)) 
+null.dat <- rbind(dat, null.dat) 
+
+############################
+######### LAND TYPE ########
+############################
+
+m1.null <- glm.nb(sprich ~ entity_class2*abslatitude, data = null.dat) 
+rac <- Spat.cor(m1.null, null.dat, 2000) 
+m1.null.rac <- glm.nb(sprich ~ entity_class2*abslatitude + rac , data = null.dat) 
+summary(m1.null.rac)
+
+# check assumptions
+par(mfrow = c(2,2))
+plot(m1.null.rac)
+Check.disp(m1.null.rac, dat)
+vif(m1.null.rac)
+
+# find simple slope by entity_class2:
+# default link logit
+emtrends(m1.null.rac, ~ entity_class2, var="abslatitude")
+
+############################
+########### PLOT ###########
+##### LAT BY LAND TYPE #####
+############################
+
+new.null.dat.ml <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Mainland", rac = mean(rac))
+new.null.dat.oi <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Oceanic", rac = mean(rac))
+new.null.dat.noi <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Non-oceanic", rac = mean(rac))
+new.null.dat.null <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
+  mutate(entity_class2 = "Null", rac = mean(rac))
+new.null.dat <- rbind(new.null.dat.ml, new.null.dat.oi, new.null.dat.noi, new.null.dat.null) 
+
+pred.ml <- predict(m1.null.rac, newdata = new.null.dat.ml, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.null.dat.ml$abslatitude, entity_class2 = "Mainland")
+pred.oi <- predict(m1.null.rac,newdata = new.null.dat.oi, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.null.dat.oi$abslatitude, entity_class2 = "Oceanic")
+pred.noi <- predict(m1.null.rac,newdata = new.null.dat.noi, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.null.dat.noi$abslatitude, entity_class2 = "Non-oceanic")
+pred.null <- predict(m1.null.rac,newdata = new.null.dat.null, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.null.dat.null$abslatitude, entity_class2 = "Null")
+pred.all <- rbind(pred.ml, pred.oi, pred.noi, pred.null) 
+
+# create a custom color scale
+colScale <- scale_colour_manual(values = c("darkseagreen3", "lightgrey","black","cyan4"))
+fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey","black","cyan4"))
+
+lat.landtype.null <- 
+  ggplot(data = pred.all,aes(x = abslatitude, y = fit, color = entity_class2, fill = entity_class2))+
+  geom_line() +
+  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8) + 
+  #remove this for no point version:
+  #geom_point(data = null.dat, mapping = aes(x = abslatitude, y = sprich, color = factor(entity_class2)), alpha = 0.2, size = 5)+ 
+  xlab("Absolute latitude") +
+  ylab("Species richness") +
+  theme_classic(base_size = 40)+
+  ylim(0,500) +
+  colScale +
+  fillScale +
+  #theme(legend.position = 'top') +
+  theme(legend.justification=c(1,1), legend.position=c(1,1))+
+  guides(fill = FALSE) +
+  guides(color = guide_legend(title = "Land Type", override.aes = list(fill = NA, linetype = c(0, 0, 0, 0))))+
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30))
+
+# with non-oceanic
+png("figures/Myc_LatbyLandType_4type.jpg", width = 10, height = 10, units = 'in', res = 300)
+lat.landtype.null
+dev.off()
+
+############################
+######### MAINLAND #########
+######### N = 608 ##########
+############################
+
+dat.ml <- dat %>% filter(entity_class2 == "Mainland")
+m1.ml <- glm.nb(sprich ~ abslatitude, data = dat.ml, control = glm.control(maxit = 500)) 
+rac <- Spat.cor(m1.ml,dat.ml,2000)
+m1.ml.rac <- glm.nb(sprich ~ abslatitude  + rac , data = dat.ml, control = glm.control(maxit = 500)) 
+summary(m1.ml.rac)
+
+# check assumptions
+par(mfrow = c(2,2))
+plot(m1.ml.rac)
+Check.disp(m1.ml.rac,dat.ml)
+vif(m1.ml.rac)
+
+####################################
+############ ISLAND TYPES ##########
+####################################
+
+############################
+######## READ DATA #########
+############################
+
+dat2 <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
+  # extended data option: 
+  # dat <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
+  filter(!entity_class == "undetermined") %>%                                        
+  select(c("entity_ID","entity_class","sprich","latitude","longitude","geology", "area", "elev_range", "dist", "CHELSA_annual_mean_Temp", "CHELSA_annual_Prec", 
+           "AM","EM","ORC","NM")) %>%
+  rename(temp = CHELSA_annual_mean_Temp, prec = CHELSA_annual_Prec) %>%
+  mutate(entity_class2 = case_when(geology == "dev" ~ "Oceanic",                      
+                                   geology == "nondev" ~ "Non-oceanic",
+                                   entity_class =="Mainland" ~ "Mainland")) %>%
+  select(-geology) %>%                                                              
+  mutate(abslatitude = abs(latitude)) %>%                                             
+  mutate(abslatitude = as.vector(abslatitude)) %>%    
+  mutate(elev_range = ifelse(elev_range==0,1, elev_range)) %>%                                   
+  mutate(elev_range = ifelse(is.na(elev_range),1, elev_range)) %>%
+  filter(area > 6) %>% # based on paper Patrick shared
+  #for models only; remove for figs:
+  mutate(area = as.vector(scale(log10((area)+.01))), dist = as.vector(scale(log10((dist)+.01))), elev_range = as.vector(scale(log10((elev_range)+.01))),
+         temp = as.vector(scale(temp)), prec = as.vector(scale(log10((prec)+.01)))) %>%
+  #filter(!entity_class2 == "Non-oceanic") %>%
+  drop_na() 
+
+####################################
+####### OCEANIC ISLANDS ONLY #######
+############# N = 212 ##############
+####################################
+
+dat.o <- dat2 %>% filter(entity_class2 == "Oceanic")
+m1.o <- glm.nb(sprich ~ abslatitude, data = dat.o, control = glm.control(maxit = 500)) 
+rac <- Spat.cor(m1.o,dat.o,2000)
+m1.o.rac <- glm.nb(sprich ~ abslatitude  + rac , data = dat.o, control = glm.control(maxit = 500)) 
+summary(m1.o.rac)
+
+# check assumptions
+par(mfrow = c(2,2))
+plot(m1.o.rac)
+Check.disp(m1.o.rac,dat.o)
+vif(m1.o.rac)
+
+####################################
+##### NON- OCEANIC ISLANDS ONLY ####
+############# N = 133 ##############
+####################################
+
+dat.no <- dat2 %>% filter(entity_class2 == "Non-oceanic")
+m1.no <- glm.nb(sprich ~ abslatitude, data = dat.no, control = glm.control(maxit = 500)) 
+rac <- Spat.cor(m1.no,dat.no,2000)
+m1.no.rac <- glm.nb(sprich ~ abslatitude + rac , data = dat.no, control = glm.control(maxit = 500)) 
+summary(m1.no.rac)
+
+# check assumptions
+par(mfrow = c(2,2))
+plot(m1.no.rac)
+Check.disp(m1.no.rac,dat.no)
+vif(m1.no.rac)
+
+############################
+######## ML PREDICT ########
+############################
+
+############################
+######### MAINLAND #########
+############################
+
+dat.ml <- dat %>% filter(entity_class2 == "Mainland")
+
+gam.mod_sprich <- gam(sprich ~ s(abslatitude) , family = nb(link = "log"), data = dat.ml) 
+summary(gam.mod_sprich)
+
+mod <- gam.mod_sprich
+new.dat.sprich <- with(mod$model, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) 
+pred_sprich <- predict.gam(mod,newdata = new.dat.sprich, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.dat.sprich$abslatitude)
+
+# check assumptions
+gam.check(gam.mod_sprich)
+Check.disp(gam.mod_sprich,dat)
+
+############################
+###### MAINLAND RESID ######
+############################
+
+resid.resp <- residuals.gam(mod, type ="response")
+pred.for.resid <- predict.gam(mod, type="response")
+
+resid <- dat.ml %>%
+  mutate(resid = resid.resp, pred = pred.for.resid) %>%
+  mutate(resid.d = resid + pred) 
+
+ml.GAM.plot <-
+  ggplot(data = pred_sprich,aes(x = abslatitude, y = fit))+
+  geom_line(color="darkseagreen3", size=1.5) +
+  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8, fill="darkseagreen3") +
+  geom_point(data = resid, aes(x = abslatitude, y = resid.d), alpha = 0.35, size =2.5, color ="darkseagreen3")+
+  xlab("Absolute latitude") +
+  ylab("Species richness") +
+  theme_classic(base_size = 40) +
+  ylim(0,10000) 
+
+png("figures/Mainland.GAM.resid.jpg", width = 10, height = 10, units = 'in', res = 300)
+ml.GAM.plot
+dev.off()
+
+ml.GAM.resid <-
+  ggplot()+
+  #geom_line(color="darkseagreen3", size=1.5) +
+  #geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8, fill="darkseagreen3") +
+  geom_point(data = resid, aes(x = abslatitude, y = resid), alpha = 0.35, size =2.5, color ="darkseagreen3")+
+  xlab("Absolute latitude") +
+  ylab("Model residuals") +
+  theme_classic(base_size = 40) +
+  ylim(-5000,5000) +
+  geom_hline(yintercept=0, linetype="dashed")
+
+png("figures/Mainland.GAM.resid.jpg", width = 10, height = 10, units = 'in', res = 300)
+ml.GAM.resid
+dev.off()
+
+############################
+####### MAINLAND AM ########
+############################
+
+gam.mod.AM <- gam(AM ~ s(abslatitude),family=nb(link="log"), data = dat.ml) 
+summary(gam.mod.AM)
+
+mod <- gam.mod.AM
+new.dat.AM <- with(mod$model, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) 
+pred.AM <- predict.gam(mod,newdata = new.dat.AM, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.dat.AM$abslatitude, myctype = "AM") 
+
+# check assumptions
+gam.check(gam.mod.AM)
+Check.disp(gam.mod.AM,dat)
+
+############################
+####### MAINLAND EM ########
+############################
+
+gam.mod.EM <- gam(EM ~ s(abslatitude),family=nb(link="log"), data = dat.ml) 
+summary(gam.mod.EM)
+
+mod <- gam.mod.EM
+new.dat.EM <- with(mod$model, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) 
+pred.EM <- predict.gam(mod,newdata = new.dat.EM, type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  mutate(abslatitude = new.dat.EM$abslatitude, myctype = "EM") 
+
+# check assumptions
+gam.check(gam.mod.EM)
+Check.disp(gam.mod.EM,dat)
+
+############################
+####### MAINLAND ORC #######
+############################
+
+gam.mod.ORC <- gam(ORC ~ s(abslatitude), family=nb(link="log"), data = dat.ml) 
+summary(gam.mod.ORC)
+
+mod <- gam.mod.ORC
+new.dat.ORC <- with(mod$model, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) 
+pred.ORC <- predict.gam(mod,newdata = new.dat.ORC, type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  mutate(abslatitude = new.dat.ORC$abslatitude, myctype = "ORC") 
+
+# check assumptions
+gam.check(gam.mod.ORC)
+Check.disp(gam.mod.ORC,dat)
+
+############################
+####### MAINLAND NM ########
+############################
+
+gam.mod.NM <- gam(NM ~ s(abslatitude), family=nb(link="log"), data = dat.ml) 
+summary(gam.mod.NM)
+
+mod <- gam.mod.NM
+new.dat.NM <- with(mod$model, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) 
+pred.NM <- predict.gam(mod,newdata = new.dat.NM, type = "response", se = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude = new.dat.NM$abslatitude, myctype = "NM") 
+
+# check assumptions
+gam.check(gam.mod.NM)
+Check.disp(gam.mod.NM,dat)
+
+############################
+########## PLOT ############
+##### LAT BY MYC TYPE ######
+############################
+
+#pred.mainland <- rbind(pred.AM,pred.EM,pred.ORC,pred.NM)
+pred.mainland <- rbind(pred.AM,pred.EM,pred.NM)
+
+#dat.ml.cond <- dat.ml %>%
+#  select(abslatitude, AM,EM,ORC,NM) %>%
+#  gather(key="myctype", value="sprich", AM,EM,ORC,NM) 
+
+dat.ml.cond <- dat.ml %>%
+  select(abslatitude, AM,EM,NM) %>%
+  gather(key="myctype", value="sprich", AM,EM,NM) 
+
+# create a custom color scale
+colScale <- scale_colour_manual(values=c("royalblue4", "royalblue3","darkgrey"))
+fillScale <- scale_fill_manual(values=c("royalblue4", "royalblue3","darkgrey"))
+
+#pred.mainland$myctype <- ordered(pred.mainland$myctype, levels = c("AM","EM","ORC","NM"))
+#dat.ml.cond$myctype <- ordered(dat.ml.cond$myctype, levels = c("AM","EM","ORC","NM"))
+
+pred.mainland$myctype <- ordered(pred.mainland$myctype, levels = c("AM","EM","NM"))
+dat.ml.cond$myctype <- ordered(dat.ml.cond$myctype, levels = c("AM","EM","NM"))
+
+lat.myctype <-
+ggplot(pred.mainland,aes(x =abslatitude,y=fit,color =myctype, fill =myctype))+
+  geom_line(size=1) +
+  geom_point(data=dat.ml.cond, aes(x = abslatitude,y=sprich, color =factor(myctype)), alpha=0.3,size=4)+ 
+  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.5) + 
+  xlab("Absolute latitude") +
+  ylab("Species richness")+
+  theme_classic(base_size = 25)+
+  ylim(0,4000)+
+  colScale+
+  fillScale+
+  theme(legend.position = 'none')+
+  #theme(legend.justification=c(1,1), legend.position=c(1,1))+
+  guides(fill = FALSE) +
+  guides(color = guide_legend(title="Mycorrhizal \nType",override.aes=list(fill =NA,size =3, alpha =0.7,linetype = c(0, 0, 0))))+
+  theme(axis.text.x = element_text(size =20),axis.text.y = element_text(angle = 45,size=20))
+
+# write out
+png("figures/Myc_LatbyMycType.jpg", width=10, height= 10, units='in', res=300)
+lat.myctype
+dev.off()
+
+############################
+###### PREDICT EXP IS ######
+####### ALL ISLANDS ########
+############################
+
+dat.is.min <- dat %>% filter(entity_class=="Island") %>% select(c('entity_ID',"abslatitude"))
+
+pred_sprich <- predict.gam(gam.mod_sprich, newdata = dat.is.min, type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  select(fit)
+pred_sprich_df <- cbind(dat.is.min,pred_sprich) %>% rename(sprich_exp = fit)
+
+pred_AM <- predict.gam(gam.mod.AM,newdata = dat.is.min,type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  select(fit)
+pred_AM_df <- cbind(dat.is.min,pred_AM) %>% rename(AM_exp = fit)
+
+pred_EM <- predict.gam(gam.mod.EM,newdata = dat.is.min,type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  select(fit)
+pred_EM_df <- cbind(dat.is.min,pred_EM) %>% rename(EM_exp = fit)
+
+pred_ORC <- predict.gam(gam.mod.ORC,newdata = dat.is.min,type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  select(fit)
+pred_ORC_df <- cbind(dat.is.min,pred_ORC) %>% rename(ORC_exp = fit)
+
+pred_NM <- predict.gam(gam.mod.NM,newdata = dat.is.min,type = "response", se = TRUE) %>%
+  as.data.frame() %>%
+  select(fit)
+pred_NM_df <- cbind(dat.is.min,pred_NM) %>% rename(NM_exp = fit)
+
+pred_is.dat <- dat %>%
+  filter(entity_class=="Island") %>%
+  left_join(pred_sprich_df, by= c('entity_ID','abslatitude')) %>%
+  left_join(pred_AM_df, by= c('entity_ID','abslatitude')) %>%
+  left_join(pred_EM_df, by= c('entity_ID','abslatitude')) %>%
+  left_join(pred_ORC_df, by= c('entity_ID','abslatitude')) %>%
+  left_join(pred_NM_df, by= c('entity_ID','abslatitude')) %>%
+  mutate_at(c('AM_exp','EM_exp','ORC_exp', 'NM_exp','sprich_exp'), as.integer) %>%
+  mutate(propAM_exp = AM_exp/(AM_exp + EM_exp + ORC_exp + NM_exp)) %>%
+  mutate(propEM_exp = EM_exp/(AM_exp + EM_exp + ORC_exp + NM_exp)) %>%
+  mutate(propORC_exp = ORC_exp/(AM_exp + EM_exp + ORC_exp + NM_exp))
+
+# write out
+saveRDS(pred_is.dat,"data/GAMexp_native_myc_latitude_data_2023.RDS")
+
+############################
+####### MAIN MODELS ########
+############################
+
+############################
+######## CREATE DATA #######
+############################
+
+# Read data and calc debts
+full.dat <- dat2 %>%
+  select(c("entity_ID", "dist", "area"))
+
+# version 1; debt & C_debt neg to 0, >1 to 1:
+pred_is.dat.shrink <- readRDS("data/GAMexp_native_myc_latitude_data_2023.RDS") %>%
+  select(-area) %>%
+  mutate(sprich = AM + EM + ORC + NM, sprich_exp = AM_exp + EM_exp + ORC_exp + NM_exp) %>%
+  mutate(AMdiff = AM_exp - AM, EMdiff = EM_exp - EM, ORCdiff = ORC_exp - ORC, NMdiff = NM_exp - NM, sprichdiff = sprich_exp - sprich) %>%
+  mutate(AMdebt = (AMdiff/AM_exp), EMdebt = (EMdiff/EM_exp), ORCdebt = (ORCdiff/ORC_exp), NMdebt = (NMdiff/NM_exp), Tdebt = (sprichdiff/sprich_exp))  %>%
+  mutate(AMdebt = ifelse(AMdebt < 0, 0, AMdebt)) %>% mutate(EMdebt = ifelse(EMdebt <0, 0, EMdebt)) %>% mutate(ORCdebt = ifelse(ORCdebt <0, 0, ORCdebt)) %>% mutate(NMdebt = ifelse(NMdebt <0, 0, NMdebt)) %>% mutate(Tdebt = ifelse(Tdebt <0, 0, Tdebt)) %>%
+  mutate(AMdebt = ifelse(AMdebt > 1, 1, AMdebt)) %>% mutate(EMdebt = ifelse(EMdebt >1, 1, EMdebt)) %>% mutate(ORCdebt = ifelse(ORCdebt >1, 1, ORCdebt)) %>% mutate(NMdebt = ifelse(NMdebt >1, 1, NMdebt)) %>% mutate(Tdebt = ifelse(Tdebt >1, 1, Tdebt)) %>%
+  mutate(C_AMdebt = (AMdiff/sprichdiff), C_EMdebt = (EMdiff/sprichdiff), C_ORCdebt = (ORCdiff/sprichdiff), C_NMdebt = (NMdiff/sprichdiff)) %>% 
+  mutate(C_AMdebt = ifelse(C_AMdebt < 0, 0, C_AMdebt)) %>% mutate(C_EMdebt = ifelse(C_EMdebt <0, 0, C_EMdebt)) %>% mutate(C_ORCdebt = ifelse(C_ORCdebt <0, 0, C_ORCdebt)) %>% mutate(C_NMdebt = ifelse(C_NMdebt <0, 0, C_NMdebt)) %>%
+  mutate(C_AMdebt = ifelse(C_AMdebt > 1, 1, C_AMdebt)) %>% mutate(C_EMdebt = ifelse(C_EMdebt >1, 1, C_EMdebt)) %>% mutate(C_ORCdebt = ifelse(C_ORCdebt >1, 1, C_ORCdebt)) %>% mutate(C_NMdebt = ifelse(C_NMdebt >1, 1, C_NMdebt)) %>%
+  left_join(full.dat, by = "entity_ID") 
+
+# version 2; remove negatives: 4% data lost
+pred_is.dat.drop <- readRDS("data/GAMexp_native_myc_latitude_data_2023.RDS") %>%
+  select(-area) %>%
+  mutate(sprich = AM + EM + ORC + NM, sprich_exp = AM_exp + EM_exp + ORC_exp + NM_exp) %>%
+  mutate(AMdiff = AM_exp - AM, EMdiff = EM_exp - EM, ORCdiff = ORC_exp - ORC, NMdiff = NM_exp - NM, sprichdiff = sprich_exp - sprich) %>%
+  mutate(AMdebt = (AMdiff/AM_exp), EMdebt = (EMdiff/EM_exp), ORCdebt = (ORCdiff/ORC_exp), NMdebt = (NMdiff/NM_exp), Tdebt = (sprichdiff/sprich_exp))%>%
+  mutate(C_AMdebt = (AMdiff/sprichdiff), C_EMdebt = (EMdiff/sprichdiff), C_ORCdebt = (ORCdiff/sprichdiff), C_NMdebt = (NMdiff/sprichdiff)) %>%
+  filter(AMdiff > 0 & EMdiff >0 & ORCdiff > 0 & NMdiff > 0 & sprichdiff > 0) %>%
+  filter(AMdebt > 0 & EMdebt >0 & ORCdebt > 0 & NMdebt > 0 & Tdebt > 0) %>%
+  filter(C_AMdebt > 0 & C_EMdebt > 0 & C_ORCdebt > 0 & C_NMdebt > 0) %>%
+  left_join(full.dat, by = "entity_ID") 
+
+############################
+######### PREP DATA ########
+############################
+
+# ! choose one
+pred_is.dat <- pred_is.dat.shrink
+pred_is.dat <- pred_is.dat.drop
+
+# write out
+debt <- pred_is.dat.shrink %>% select(c("entity_ID","Tdebt","sprichdiff","dist","area","elev_range","latitude","longitude","abslatitude","sprich_exp", "temp","prec"))
+saveRDS(debt,"data/debt_native_myc_latitude_data_2023.RDS")
+
+pred_is.dat.alld <- pred_is.dat %>% 
+  select(c('entity_ID','AMdebt','EMdebt','ORCdebt','NMdebt')) %>%
+  gather(key = "myctype", value = "debt", AMdebt, EMdebt, ORCdebt, NMdebt) %>%
+  mutate(myctype = case_when(myctype=="AMdebt" ~ "AM",                                   
+                             myctype=="EMdebt" ~ "EM", 
+                             myctype=="ORCdebt" ~ "ORC", 
+                             myctype=="NMdebt" ~ "NM")) 
+
+pred_is.dat.allcd <- pred_is.dat %>% 
+  select(c('entity_ID','C_AMdebt','C_EMdebt','C_ORCdebt','C_NMdebt')) %>%
+  gather(key = "myctype", value = "debt.c", C_AMdebt, C_EMdebt, C_ORCdebt, C_NMdebt)%>%
+  mutate(myctype = case_when(myctype == "C_AMdebt" ~ "AM",                                   
+                             myctype == "C_EMdebt" ~ "EM", 
+                             myctype == "C_ORCdebt" ~ "ORC", 
+                             myctype == "C_NMdebt" ~ "NM"))
+
+pred_is.dat.all.diff <- pred_is.dat %>% 
+  select(c('entity_ID','sprich','latitude','longitude','abslatitude','AMdiff','EMdiff','ORCdiff','NMdiff','dist','area','elev_range', 'temp','prec')) %>%
+  gather(key = "myctype", value = "diff", AMdiff, EMdiff, ORCdiff, NMdiff) %>%
+  mutate(myctype = case_when(myctype == "AMdiff" ~ "AM",                                   
+                             myctype == "EMdiff" ~ "EM", 
+                             myctype == "ORCdiff" ~ "ORC", 
+                             myctype == "NMdiff" ~ "NM")) 
+
+pred_is.dat.all.exp <- pred_is.dat %>% 
+  select(c('entity_ID','AM_exp','EM_exp','ORC_exp','NM_exp')) %>%
+  gather(key = "myctype", value = "exp", AM_exp, EM_exp, ORC_exp,NM_exp) %>%
+  mutate(myctype = case_when(myctype == "AM_exp" ~ "AM",                                   
+                             myctype == "EM_exp" ~ "EM", 
+                             myctype == "ORC_exp" ~ "ORC", 
+                             myctype == "NM_exp" ~ "NM")) 
+
+
+pred_is.dat.all.obs <- pred_is.dat %>% 
+  select(c('entity_ID', 'AM', 'EM', 'ORC', 'NM')) %>%
+  gather(key = "myctype", value = "obs", AM, EM, ORC, NM) 
+
+pred_is.dat.all.T <- pred_is.dat %>% select(entity_ID, sprichdiff)
+
+pred_is.dat.all <- pred_is.dat.all.diff %>%
+  left_join(pred_is.dat.all.exp, by = c("myctype", "entity_ID")) %>%
+  left_join(pred_is.dat.all.obs, by = c("myctype", "entity_ID")) %>%
+  left_join(pred_is.dat.alld, by = c("myctype", "entity_ID")) %>%
+  left_join(pred_is.dat.allcd, by = c("myctype", "entity_ID")) %>%
+  left_join(pred_is.dat.all.T, by = c("entity_ID")) %>%
+  mutate(debt.weights = exp, debt.c.weights = abs(sprichdiff)) %>%
+  mutate(myctype = as.factor(myctype))
+
+pred_is.dat.all <- within(pred_is.dat.all, myctype <- relevel(myctype, ref = "NM"))
+
+############################
+#### LAT RELATIONSHIPS #####
+############################
+
+# check correlations between abslatitude and area, dist, elev_range
+lat.dat <- pred_is.dat.all %>%                                                                                         
+  select(c("abslatitude", "area", "dist", "elev_range"))                                
+lat.cor <- as.matrix(cor(lat.dat))  
+
+mod <- lm(abslatitude ~ area, lat.dat)
+Area.lat.plot <- 
+  ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = area), color = "darkgrey") +
+  geom_point(alpha = 0.1, size = 5) +
+  geom_smooth(method = "loess", color = "aquamarine4", fill = "aquamarine4") +
+  theme_classic(base_size = 40) +
+  ylab("Area") +
+  xlab("Absolute latitude") +
+  theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+  ylim(-2,2) 
+
+mod <- lm(abslatitude ~ dist, lat.dat)
+Dist.lat.plot <- 
+  ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = dist), color = "darkgrey") +
+  geom_point(alpha = 0.1, size = 5) +
+  geom_smooth(method = "loess", color = "aquamarine4", fill = "aquamarine4") +
+  theme_classic(base_size = 40) +
+  ylab("Distance") +
+  xlab("Absolute latitude") +
+  theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+  ylim(0,2) 
+
+mod <- lm(abslatitude ~ elev_range, lat.dat)
+Elev.lat.plot <- 
+  ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = elev_range), color = "darkgrey") +
+  geom_point(alpha = 0.1, size = 5) +
+  geom_smooth(method = "loess", color = "aquamarine4", fill = "aquamarine4") +
+  theme_classic(base_size = 40) +
+  ylab("Elevation range") +
+  xlab("Absolute latitude") +
+  theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+  ylim(-2,2) 
+
+# write out
+png("figures/Lat_area.jpg", width = 10, height = 10, units = 'in', res = 300)
+Area.lat.plot
+dev.off()
+
+png("figures/Lat_dist.jpg", width = 10, height = 10, units = 'in', res = 300)
+Dist.lat.plot
+dev.off()
+
+png("figures/Lat_elev.jpg", width = 10, height = 10, units = 'in', res = 300)
+Elev.lat.plot
+dev.off()
+
+############################
+####### DEFICIT PLOT #######
+############################
+
+mod <- lm(abslatitude ~ sprichdiff, pred_is.dat.all)
+summary(mod)
+
+Deficit.lat.plot <- 
+  ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = sprichdiff), color = "coral3", fill="coral3") +
+  geom_point(alpha = 0.8, size = 5, color="coral3") +
+  geom_smooth(method = "loess", color = "coral3", fill = "coral3") +
+  theme_classic(base_size = 40) +
+  ylab("Species deficit") +
+  xlab("Absolute latitude") +
+  #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30))+
+  ylim(0,4000) 
+
+# write out
+png("figures/Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
+Deficit.lat.plot
+dev.off()
+
+############################
+######### CUT DATA #########
+############################
+
+# set vars
+x_var = pred_is.dat.all$abslatitude
+myc_var= pred_is.dat.all$myctype
+
+y_var = pred_is.dat.all$debt
+
+df <- data.frame("xvar" = x_var,"yvar" = y_var,"myctype"=myc_var)
+
+# create binned y-values for the x-axis
+quantiles_for_cutting <- quantile(df$xvar,seq(0,1,.20))
+
+# cut the data
+df$cuts_raw <- cut(df$xvar,breaks = quantiles_for_cutting, include.lowest = T)
+
+# calculate the average value within each bin of the x-axis data
+mean_per_cut <- df %>% group_by(cuts_raw) %>%
+  summarize(mean_cut_xval = mean(xvar))
+
+#now use the "mean_per_cut" to define our new cuts
+df$cuts_labeled <- as.numeric(as.character(cut(df$xvar,breaks = quantiles_for_cutting,
+                                               labels = mean_per_cut$mean_cut_xval, include.lowest = T)))
+
+#now calculate the mean response variable values within each bin: 95% CIs assuming a normal distribution here
+aggregated_data <- df %>% group_by(cuts_raw,cuts_labeled,myctype) %>%
+  summarize(mean_y = mean(yvar),
+            sd_y = sd(yvar),
+            n_y = length(yvar)) %>%
+  mutate(se_y = sd_y/sqrt(n_y),
+         low95CI_y = mean_y-1.96*se_y,
+         high95CI_y = mean_y+1.96*se_y)
+
+debt.aggregated_data <- aggregated_data
+
+############################
+######### ONE MODEL ########
+############################
+
+############################
+######## WITHIN DEBT #######
+############################
+
+pred.allcatd <- glm(debt ~ abslatitude*myctype + area + dist + elev_range  + prec + (1|entity_ID), weights = debt.weights, data = pred_is.dat.all) 
+summary(pred.allcatd)
+rac <- Spat.cor.rep(pred.allcatd,pred_is.dat.all,2000)
+pred.allcatd.rac  <- glm(debt ~ abslatitude*myctype + area + dist + elev_range  + prec + rac +(1|entity_ID), weights = debt.weights, data = pred_is.dat.all) 
+summary(pred.allcatd.rac)
+
+pred_is.dat.all$rac <- rac
+
+#contrasts
+means <- emmeans(pred.allcatd.rac, ~ myctype, data = pred_is.dat.all)
+
+#look at means order to determine how to write contrasts:
+means
+
+#write contrasts:
+contrasts <- list("NM v AM" = c(-1,1,0,0),
+                  "NM v EM" = c(-1,0,1,0),
+                  "NM v ORC" = c(-1,0,0,1)
+)
+
+#extract results to df:
+results <- lsmeans::contrast(means,contrasts)
+results.df <- as.data.frame(results)
+results.df
+
+# glm diagnostics:
+par(mfrow=c(3,2))
+# homogenetity of variance:
+plot(fitted(pred.allcatd.rac) ~ resid(pred.allcatd.rac, type = "pearson"))
+# independence:
+plot(pred_is.dat.all$area ~ resid(pred.allcatd.rac, type = "pearson"))
+plot(pred_is.dat.all$dist ~ resid(pred.allcatd.rac, type = "pearson"))
+plot(pred_is.dat.all$elev_range ~ resid(pred.allcatd.rac, type = "pearson"))
+boxplot(resid(pred.allcatd.rac, type = "pearson") ~ pred_is.dat.all$myctype)
+# do not look for normality:
+# outliers:
+plot(cooks.distance(pred.allcatd.rac), type ="h")
+# check dispersion:
+Check.disp(pred.allcatd.rac, pred_is.dat.all)
+
+############################
+########## DEBT C ##########
+############################
+
+pred.allcatcd <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*myctype + area + dist + elev_range + prec + (1|entity_ID),weights = debt.c.weights, data = pred_is.dat.all) 
+rac <- Spat.cor.rep(pred.allcatcd,pred_is.dat.all,2000)
+pred.allcatcd.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*myctype + area + dist + elev_range  + prec + rac +(1|entity_ID),weights = debt.c.weights, data = pred_is.dat.all) 
+summary(pred.allcatcd.rac)
+
+# glm diagnostics:
+par(mfrow=c(3,2))
+# homogenetity of variance:
+plot(fitted(pred.allcatcd.rac) ~ resid(pred.allcatcd.rac, type = "pearson"))
+# independence:
+plot(pred_is.dat.all$area ~ resid(pred.allcatcd.rac, type = "pearson"))
+plot(pred_is.dat.all$dist ~ resid(pred.allcatcd.rac, type = "pearson"))
+plot(pred_is.dat.all$elev_range ~ resid(pred.allcatcd.rac, type = "pearson"))
+boxplot(resid(pred.allcatcd.rac, type = "pearson") ~ pred_is.dat.all$myctype)
+# do not look for normality:
+# outliers:
+plot(cooks.distance(pred.allcatcd.rac), type ="h")
+# check dispersion:
+Check.disp(pred.allcatcd.rac, pred_is.dat.all)
+
+############################
+########### PLOT ###########
+##### DEBT:FULL MODEL ######
+############################
+
+new.dat.AM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype="AM", entity_ID=pred_is.dat.all$entity_ID)
+pred.AM <- predict.glm(pred.allcatd.rac,newdata = new.dat.AM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.AM$abslatitude) 
+
+new.dat.EM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype = "EM", entity_ID=pred_is.dat.all$entity_ID)
+pred.EM <- predict.glm(pred.allcatd.rac,newdata = new.dat.EM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.EM$abslatitude) 
+
+new.dat.ORC <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype = "ORC", entity_ID=pred_is.dat.all$entity_ID)
+pred.ORC <- predict.glm(pred.allcatd.rac,newdata = new.dat.ORC, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.ORC$abslatitude) 
+
+new.dat.NM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype = "NM", entity_ID=pred_is.dat.all$entity_ID)
+pred.NM <- predict.glm(pred.allcatd.rac,newdata = new.dat.NM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.NM$abslatitude) 
+
+allcatd.plot <- 
+ggplot() +
+  #AM section
+  geom_line(data = pred.AM, mapping = aes(x = abslatitude, y = fit), color ="royalblue4")+
+  geom_ribbon(data = pred.AM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue4", alpha = 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="AM"), aes(x = abslatitude, y=debt),color ="royalblue4", alpha= 0.3, size=5) +
+  geom_point(data = debt.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled-2, y = mean_y),color = "royalblue4",size = 4,shape = 16, alpha = 0.8) +
+  geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled-2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue4", width=4,size=2, alpha = 0.8) +
+  #EM section
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha = 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt),color ="royalblue3", alpha= 0.3, size=5) +
+  geom_point(data = debt.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled+2, y = mean_y),color = "royalblue3",size = 4,shape = 16, alpha = 0.8) +
+  geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled+2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue3", width=4,size=2, alpha = 0.8) +
+  #ORC section
+  #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
+  #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha = 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="ORC"), aes(x = abslatitude, y=debt),color ="darkorchid3", alpha= 0.3, size=5) +
+  #geom_point(data = debt.aggregated_data %>% filter(myctype=="ORC"),aes(x = cuts_labeled, y = mean_y),color = "darkorchid3",size = 4,shape = 16, alpha = 0.8) +
+  #geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="ORC"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "darkorchid3", width=4,size=2, alpha = 0.8)+
+  #NM section
+  geom_line(data = pred.NM, mapping = aes(x = abslatitude, y = fit), color ="darkgrey")+
+  geom_ribbon(data = pred.NM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkgrey", alpha= 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="NM"), aes(x = abslatitude, y=debt),color ="darkgrey", alpha= 0.3, size=5) +
+  geom_point(data = debt.aggregated_data %>% filter(myctype=="NM"),aes(x = cuts_labeled+4, y = mean_y),color = "darkgrey",size = 4,shape = 16, alpha = 0.8) +
+  geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="NM"),aes(x = cuts_labeled+4, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "darkgrey", width=4, size=2, alpha = 0.8)+
+  theme_classic(base_size = 40) +
+  #geom_abline(intercept = 0, slope = 0, linetype="dashed")+
+  ylab("Proportional species deficit") +
+  xlab("Absolute latitude") +
+  ylim(0.4,1.05)
+
+# write out
+png("figures/Myc_LatBox_withindebt_fullmodelshrink.jpg", width = 10, height = 10, units = 'in', res = 300)
+allcatd.plot
+dev.off()
+
+allcatd.plot.points <- 
+  ggplot() +
+  #AM section
+  geom_line(data = pred.AM, mapping = aes(x = abslatitude, y = fit), color ="royalblue4")+
+  geom_ribbon(data = pred.AM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue4", alpha = 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="AM"), aes(x = abslatitude, y=debt),color ="royalblue4", alpha= 0.3, size=5) +
+  #EM section
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha = 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt),color ="royalblue3", alpha= 0.3, size=5) +
+  #ORC section
+  #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
+  #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha = 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="ORC"), aes(x = abslatitude, y=debt),color ="darkorchid3", alpha= 0.3, size=5) +
+  #geom_point(data = debt.aggregated_data %>% filter(myctype=="ORC"),aes(x = cuts_labeled, y = mean_y),color = "darkorchid3",size = 4,shape = 16, alpha = 0.8) +
+  #geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="ORC"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "darkorchid3", width=4,size=2, alpha = 0.8)+
+  #NM section
+  geom_line(data = pred.NM, mapping = aes(x = abslatitude, y = fit), color ="darkgrey")+
+  geom_ribbon(data = pred.NM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkgrey", alpha= 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="NM"), aes(x = abslatitude, y=debt),color ="darkgrey", alpha= 0.3, size=5) +
+  theme_classic(base_size = 40) +
+  #geom_abline(intercept = 0, slope = 0, linetype="dashed")+
+  ylab("Proportional species deficit") +
+  xlab("Absolute latitude") +
+  ylim(0,1.05)
+
+# write out
+png("figures/Myc_LatPoints_withindebt_fullmodelshrink.jpg", width = 10, height = 10, units = 'in', res = 300)
+allcatd.plot.points
+dev.off()
+
+############################
+########### PLOT ###########
+#### C DEBT:FULL MODEL #####
+############################
+
+new.dat.AM <- with(pred_is.dat.all, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "AM", entity_ID=pred_is.dat.all$entity_ID)
+pred.AM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.AM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.AM$abslatitude) 
+
+new.dat.EM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "EM", entity_ID=pred_is.dat.all$entity_ID)
+pred.EM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.EM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.EM$abslatitude) 
+
+new.dat.ORC <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "ORC", entity_ID=pred_is.dat.all$entity_ID)
+pred.ORC <- predict.glm(pred.allcatcd.rac,newdata = new.dat.ORC, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.ORC$abslatitude) 
+
+new.dat.NM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+  mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "NM", entity_ID=pred_is.dat.all$entity_ID)
+pred.NM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.NM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
+  as.data.frame() %>% 
+  mutate(abslatitude=new.dat.NM$abslatitude) 
+
+allcatcd.plot <- 
+ggplot() +
+  #AM section
+  geom_line(data = pred.AM, mapping = aes(x = abslatitude, y = fit), color ="royalblue4")+
+  geom_ribbon(data = pred.AM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue4", alpha= 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="AM"), aes(x = abslatitude, y=debt.c),color ="royalblue4", alpha= 0.3, size=2) +
+  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue4",size = 1,shape = 15) +
+  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue4", width=3,size=1.5) +
+  #EM section
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha= 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt.c),color ="royalblue3", alpha= 0.3, size=2) +
+  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue3",size = 1,shape = 15) +
+  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue3", width=3,size=1.5) +
+  #ORC section
+  #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
+  #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha= 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="ORC"), aes(x = abslatitude, y=debt.c),color ="darkorchid3", alpha= 0.3, size=2) +
+  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="ORC"),aes(x = cuts_labeled, y = mean_y),color = "darkorchid3",size = 1,shape = 15) +
+  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="ORC"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "darkorchid3", width=3,size=1.5) +
+  #NM section
+  geom_line(data = pred.NM, mapping = aes(x = abslatitude, y = fit), color ="darkgrey")+
+  geom_ribbon(data = pred.NM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkgrey", alpha= 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="NM"), aes(x = abslatitude, y=debt.c),color ="darkgrey", alpha= 0.3, size=2) +
+  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="NM"),aes(x = cuts_labeled, y = mean_y),color = "darkgrey",size = 1,shape = 15) +
+  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="NM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "darkgrey", width=3,size=1.5) +
+  theme_classic(base_size = 15) +
+  #geom_abline(intercept = 0, slope = 0, linetype="dashed")+
+  ylab("Contribution deficit") +
+  xlab("Absolute latitude") +
+  ylim(0,1.2)
+
+# write out
+png("figures/Myc_LatPoly_contdebt_fullmodel_shrink.jpg", width = 6, height = 6, units ='in', res = 300)
+allcatcd.plot
+dev.off()
+
+############################
+###### MODEL PER MYC #######
+############################
+
+pred_is.dat.AM <- pred_is.dat.all %>% filter(myctype == "AM")
+pred_is.dat.EM <- pred_is.dat.all %>% filter(myctype == "EM")
+pred_is.dat.ORC <- pred_is.dat.all %>% filter(myctype == "ORC")
+pred_is.dat.NM <- pred_is.dat.all %>% filter(myctype == "NM")
+
+############################
+########## DEBT C ##########
+############################
+
+# AM Poly
+pred.allcatcd.AM <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec, weights = debt.c.weights, data = pred_is.dat.AM) 
+rac <- Spat.cor.rep(pred.allcatcd.AM, pred_is.dat.AM, 2000)
+pred.allcatcd.AM.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac , weights = debt.c.weights, data = pred_is.dat.AM) 
+summary(pred.allcatcd.AM.rac)
+pred.allcatcd.AM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + rac , weights = debt.c.weights, data = pred_is.dat.AM) 
+summary(pred.allcatcd.AM.rac.min)
+
+# EM Poly
+pred.allcatcd.EM <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec, weights = debt.c.weights, data = pred_is.dat.EM) 
+rac <- Spat.cor.rep(pred.allcatcd.EM, pred_is.dat.EM, 2000)
+pred.allcatcd.EM.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac, weights = debt.c.weights, data = pred_is.dat.EM) 
+summary(pred.allcatcd.EM.rac)
+pred.allcatcd.EM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist + poly(abslatitude,2,raw = TRUE):prec + rac, weights = debt.c.weights, data = pred_is.dat.EM) 
+summary(pred.allcatcd.EM.rac.min)
+
+# ORC Poly
+pred.allcatcd.ORC <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec, weights = debt.c.weights, data = pred_is.dat.ORC) 
+rac <- Spat.cor.rep(pred.allcatcd.ORC, pred_is.dat.ORC, 2000)
+pred.allcatcd.ORC.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac, weights = debt.c.weights, data = pred_is.dat.ORC) 
+summary(pred.allcatcd.ORC.rac)
+pred.allcatcd.ORC.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist + rac, weights = debt.c.weights, data = pred_is.dat.ORC) 
+summary(pred.allcatcd.ORC.rac.min)
+
+# NM Poly
+pred.allcatcd.NM <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec,weights = debt.c.weights, data = pred_is.dat.NM) 
+rac <- Spat.cor.rep(pred.allcatcd.NM, pred_is.dat.NM, 2000)
+pred.allcatcd.NM.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac, weights = debt.c.weights, data = pred_is.dat.NM) 
+summary(pred.allcatcd.NM.rac)
+pred.allcatcd.NM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE) + poly(abslatitude,2,raw = TRUE):dist + poly(abslatitude,2,raw = TRUE):prec + rac, weights = debt.c.weights, data = pred_is.dat.NM) 
+summary(pred.allcatcd.NM.rac.min)
