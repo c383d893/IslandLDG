@@ -414,6 +414,7 @@ pred.allcatd.rac  <- glm(debt ~ abslatitude*poll + area + dist +elev_range+ prec
 summary(pred.allcatd.rac)
 
 pred_is.dat.all$rac <- rac
+ref<-lsmeans(pred.allcatd.rac, pairwise ~ poll, data = pred_is.dat.all)
 
 #contrasts
 means <- emmeans(pred.allcatd.rac, ~ poll, data = pred_is.dat.all)
@@ -474,16 +475,16 @@ Check.disp(pred.allcatcd.rac, pred_is.dat.all)
 ##### DEBT:FULL MODEL ######
 ############################
 
-new.dat.poll.b <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.poll.b <- pred_is.dat.all %>% filter(poll=="poll.b") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), poll="poll.b", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.poll.b <- predict.glm(pred.allcatd.rac,newdata = new.dat.poll.b, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.poll.b$abslatitude) 
 
-new.dat.poll.ab <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.poll.ab <- pred_is.dat.all %>% filter(poll=="poll.ab") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), poll = "poll.ab", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.poll.ab <- predict.glm(pred.allcatd.rac,newdata = new.dat.poll.ab, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.poll.ab$abslatitude) 
@@ -539,16 +540,16 @@ dev.off()
 #### C DEBT:FULL MODEL #####
 ############################
 
-new.dat.poll.b <- with(pred_is.dat.all, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.poll.b <- pred_is.dat.all %>% filter(poll=="poll.b") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), poll = "poll.b", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.poll.b <- predict.glm(pred.allcatcd.rac,newdata = new.dat.poll.b, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.poll.b$abslatitude) 
 
-new.dat.poll.ab <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.poll.ab <- pred_is.dat.all %>% filter(poll=="poll.ab") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), poll = "poll.ab", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.poll.ab <- predict.glm(pred.allcatcd.rac,newdata = new.dat.poll.ab, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.poll.ab$abslatitude) 
@@ -604,3 +605,4 @@ pred.allcatcd.poll.ab.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area +
 summary(pred.allcatcd.poll.ab.rac)
 pred.allcatcd.poll.ab.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE) + rac , weights = debt.c.weights, data = pred_is.dat.poll.ab) 
 summary(pred.allcatcd.poll.ab.rac.min)
+

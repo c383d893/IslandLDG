@@ -413,6 +413,7 @@ pred.allcatd.rac  <- glm(debt ~ abslatitude*nfix + area + dist +elev_range+ prec
 summary(pred.allcatd.rac)
 
 pred_is.dat.all$rac <- rac
+ref<-lsmeans(pred.allcatd.rac, pairwise ~ nfix, data = pred_is.dat.all)
 
 #contrasts
 means <- emmeans(pred.allcatd.rac, ~ nfix, data = pred_is.dat.all)
@@ -473,16 +474,16 @@ Check.disp(pred.allcatcd.rac, pred_is.dat.all)
 ##### DEBT:FULL MODEL ######
 ############################
 
-new.dat.nfix <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.nfix <- pred_is.dat.all %>% filter(nfix=="nfix") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), nfix="nfix", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.nfix <- predict.glm(pred.allcatd.rac,newdata = new.dat.nfix, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.nfix$abslatitude) 
 
-new.dat.nonfix <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.nonfix <- pred_is.dat.all %>% filter(nfix=="nonfix") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), nfix = "nonfix", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.nonfix <- predict.glm(pred.allcatd.rac,newdata = new.dat.nonfix, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.nonfix$abslatitude) 
@@ -538,16 +539,16 @@ dev.off()
 #### C DEBT:FULL MODEL #####
 ############################
 
-new.dat.nfix <- with(pred_is.dat.all, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.nfix <- pred_is.dat.all %>% filter(nfix=="nfix") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), nfix = "nfix", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.nfix <- predict.glm(pred.allcatcd.rac,newdata = new.dat.nfix, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.nfix$abslatitude) 
 
-new.dat.nonfix <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.nonfix <- pred_is.dat.all %>% filter(nfix=="nonfix") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), nfix = "nonfix", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.nonfix <- predict.glm(pred.allcatcd.rac,newdata = new.dat.nonfix, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.nonfix$abslatitude) 

@@ -385,16 +385,16 @@ Check.disp(pred.allcatcd.rac, pred_is.dat.all)
 #### C DEBT:FULL MODEL #####
 ############################
 
-new.dat.poll.b <- with(pred_is.dat.all, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.poll.b <- pred_is.dat.all %>% filter(poll=="poll.b") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), poll = "poll.b", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.poll.b <- predict.glm(pred.allcatcd.rac,newdata = new.dat.poll.b, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.poll.b$abslatitude) 
 
-new.dat.poll.ab <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.poll.ab <- pred_is.dat.all %>% filter(poll=="poll.ab") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), poll = "poll.ab", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.poll.ab <- predict.glm(pred.allcatcd.rac,newdata = new.dat.poll.ab, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.poll.ab$abslatitude) 

@@ -485,21 +485,6 @@ png("figures/Mainland.GAM.resid.jpg", width = 10, height = 10, units = 'in', res
 ml.GAM.plot
 dev.off()
 
-ml.GAM.resid <-
-  ggplot()+
-  #geom_line(color="darkseagreen3", size=1.5) +
-  #geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8, fill="darkseagreen3") +
-  geom_point(data = resid, aes(x = abslatitude, y = resid), alpha = 0.35, size =2.5, color ="darkseagreen3")+
-  xlab("Absolute latitude") +
-  ylab("Model residuals") +
-  theme_classic(base_size = 40) +
-  ylim(-5000,5000) +
-  geom_hline(yintercept=0, linetype="dashed")
-
-png("figures/Mainland.GAM.resid.jpg", width = 10, height = 10, units = 'in', res = 300)
-ml.GAM.resid
-dev.off()
-
 ############################
 ####### MAINLAND AM ########
 ############################
@@ -892,6 +877,7 @@ pred.allcatd.rac  <- glm(debt ~ abslatitude*myctype + area + dist + elev_range  
 summary(pred.allcatd.rac)
 
 pred_is.dat.all$rac <- rac
+ref <- lsmeans(pred.allcatd.rac, pairwise ~ myctype, data = pred_is.dat.all)
 
 #contrasts
 means <- emmeans(pred.allcatd.rac, ~ myctype, data = pred_is.dat.all)
@@ -954,30 +940,30 @@ Check.disp(pred.allcatcd.rac, pred_is.dat.all)
 ##### DEBT:FULL MODEL ######
 ############################
 
-new.dat.AM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.AM <- pred_is.dat.all %>% filter(myctype=="AM") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype="AM", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.AM <- predict.glm(pred.allcatd.rac,newdata = new.dat.AM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.AM$abslatitude) 
 
-new.dat.EM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.EM <- pred_is.dat.all %>% filter(myctype=="EM") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype = "EM", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.EM <- predict.glm(pred.allcatd.rac,newdata = new.dat.EM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.EM$abslatitude) 
 
-new.dat.ORC <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.ORC <- pred_is.dat.all %>% filter(myctype=="ORC") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype = "ORC", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.ORC <- predict.glm(pred.allcatd.rac,newdata = new.dat.ORC, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.ORC$abslatitude) 
 
-new.dat.NM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.NM <- pred_is.dat.all %>% filter(myctype=="NM") %>%
   mutate(area = mean(pred.allcatd.rac$model$area), dist = mean(pred.allcatd.rac$model$dist),
-         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac), myctype = "NM", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatd.rac$model$elev_range), prec = mean(pred.allcatd.rac$model$prec), rac = mean(pred.allcatd.rac$model$rac))
 pred.NM <- predict.glm(pred.allcatd.rac,newdata = new.dat.NM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.NM$abslatitude) 
@@ -1055,30 +1041,30 @@ dev.off()
 #### C DEBT:FULL MODEL #####
 ############################
 
-new.dat.AM <- with(pred_is.dat.all, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.AM <- pred_is.dat.all %>% filter(myctype=="AM") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "AM", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.AM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.AM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.AM$abslatitude) 
 
-new.dat.EM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.EM <- pred_is.dat.all %>% filter(myctype=="EM") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "EM", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.EM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.EM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.EM$abslatitude) 
 
-new.dat.ORC <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.ORC <- pred_is.dat.all %>% filter(myctype=="ORC") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "ORC", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.ORC <- predict.glm(pred.allcatcd.rac,newdata = new.dat.ORC, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.ORC$abslatitude) 
 
-new.dat.NM <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.NM <- pred_is.dat.all %>% filter(myctype=="NM") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), myctype = "NM", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.NM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.NM, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.NM$abslatitude) 

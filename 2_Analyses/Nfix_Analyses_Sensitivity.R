@@ -386,19 +386,19 @@ Check.disp(pred.allcatcd.rac, pred_is.dat.all)
 #### C DEBT:FULL MODEL #####
 ############################
 
-new.dat.nfix <- with(pred_is.dat.all, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.nfix <- pred_is.dat.all %>% filter(nfix=="nfix") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), nfix = "nfix", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.nfix <- predict.glm(pred.allcatcd.rac,newdata = new.dat.nfix, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude=new.dat.nfix$abslatitude) 
 
-new.dat.nonfix <- with(pred_is.dat.all, expand.grid(abslatitude= seq(min(abslatitude), max(abslatitude), length = nrow(pred_is.dat.all)))) %>% 
+new.dat.nonfix <- pred_is.dat.all %>% filter(nfix=="nonfix") %>%
   mutate(area = mean(pred.allcatcd.rac$model$area), dist = mean(pred.allcatcd.rac$model$dist),
-         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac), nfix = "nonfix", entity_ID=pred_is.dat.all$entity_ID)
+         elev_range = mean(pred.allcatcd.rac$model$elev_range), prec = mean(pred.allcatcd.rac$model$prec), rac = mean(pred.allcatcd.rac$model$rac))
 pred.nonfix <- predict.glm(pred.allcatcd.rac,newdata = new.dat.nonfix, type = "response", se = TRUE, newdata.guaranteed = TRUE) %>%
   as.data.frame() %>% 
-  mutate(abslatitude=new.dat.nonfix$abslatitude) 
+  mutate(abslatitude=new.dat.nonfix$abslatitude)  
 
 allcatcd.plot <- 
   ggplot() +

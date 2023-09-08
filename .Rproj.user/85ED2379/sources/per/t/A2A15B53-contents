@@ -96,7 +96,9 @@ Spat.cor.rep <- function(mod,dat, dist) {
 ######## READ DATA #########
 ############################
 
-dat <-  readRDS("data/Ext_native_myc_latitude_data_2023.RDS") %>%
+dat <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
+  # extended data option: 
+  # dat <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
   filter(!entity_class == "undetermined") %>%                                        
   select(c("entity_ID","entity_class","sprich","latitude","longitude","geology", "area",  "CHELSA_annual_mean_Temp", "CHELSA_annual_Prec","elev_range",
            "AM","EM","ORC","NM")) %>%
@@ -356,6 +358,7 @@ dev.off()
 
 ############################
 ######### MAINLAND #########
+######### N = 608 ##########
 ############################
 
 dat.ml <- dat %>% filter(entity_class2 == "Mainland")
@@ -378,7 +381,9 @@ vif(m1.ml.rac)
 ######## READ DATA #########
 ############################
 
-dat2 <-  readRDS("data/Ext_native_myc_latitude_data_2023.RDS") %>%
+dat2 <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
+  # extended data option: 
+  # dat <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
   filter(!entity_class == "undetermined") %>%                                        
   select(c("entity_ID","entity_class","sprich","latitude","longitude","geology", "area", "elev_range", "dist", "CHELSA_annual_mean_Temp", "CHELSA_annual_Prec", 
            "AM","EM","ORC","NM")) %>%
@@ -417,7 +422,7 @@ vif(m1.o.rac)
 
 ####################################
 ##### NON- OCEANIC ISLANDS ONLY ####
-############# N = 131 ##############
+############# N = 133 ##############
 ####################################
 
 dat.no <- dat2 %>% filter(entity_class2 == "Non-oceanic")
@@ -442,7 +447,6 @@ vif(m1.no.rac)
 
 dat.ml <- dat %>% filter(entity_class2 == "Mainland")
 
-# abslat version
 gam.mod_sprich <- gam(sprich ~ s(abslatitude) , family = nb(link = "log"), data = dat.ml) 
 summary(gam.mod_sprich)
 
@@ -460,8 +464,8 @@ Check.disp(gam.mod_sprich,dat)
 ###### MAINLAND RESID ######
 ############################
 
-resid.resp <- residuals.glm(mod, type ="response")
-pred.for.resid <- predict.glm(mod, type="response")
+resid.resp <- residuals.gam(mod, type ="response")
+pred.for.resid <- predict.gam(mod, type="response")
 
 resid <- dat.ml %>%
   mutate(resid = resid.resp, pred = pred.for.resid) %>%
@@ -485,7 +489,6 @@ dev.off()
 ####### MAINLAND AM ########
 ############################
 
-# abslat version
 gam.mod.AM <- gam(AM ~ s(abslatitude),family=nb(link="log"), data = dat.ml) 
 summary(gam.mod.AM)
 
@@ -503,7 +506,6 @@ Check.disp(gam.mod.AM,dat)
 ####### MAINLAND EM ########
 ############################
 
-# abslat version
 gam.mod.EM <- gam(EM ~ s(abslatitude),family=nb(link="log"), data = dat.ml) 
 summary(gam.mod.EM)
 
@@ -521,7 +523,6 @@ Check.disp(gam.mod.EM,dat)
 ####### MAINLAND ORC #######
 ############################
 
-# abslat version
 gam.mod.ORC <- gam(ORC ~ s(abslatitude), family=nb(link="log"), data = dat.ml) 
 summary(gam.mod.ORC)
 
@@ -539,7 +540,6 @@ Check.disp(gam.mod.ORC,dat)
 ####### MAINLAND NM ########
 ############################
 
-# abslat version
 gam.mod.NM <- gam(NM ~ s(abslatitude), family=nb(link="log"), data = dat.ml) 
 summary(gam.mod.NM)
 
@@ -646,7 +646,7 @@ pred_is.dat <- dat %>%
   mutate(propORC_exp = ORC_exp/(AM_exp + EM_exp + ORC_exp + NM_exp))
 
 # write out
-saveRDS(pred_is.dat,"data/GAMexp_Ext_native_myc_latitude_data_2023.RDS")
+saveRDS(pred_is.dat,"data/GAMexp_native_myc_latitude_data_2023.RDS")
 
 ############################
 ####### MAIN MODELS ########
@@ -661,7 +661,7 @@ full.dat <- dat2 %>%
   select(c("entity_ID", "dist", "area"))
 
 # version 1; debt & C_debt neg to 0, >1 to 1:
-pred_is.dat.shrink <- readRDS("data/GAMexp_Ext_native_myc_latitude_data_2023.RDS") %>%
+pred_is.dat.shrink <- readRDS("data/GAMexp_native_myc_latitude_data_2023.RDS") %>%
   select(-area) %>%
   mutate(sprich = AM + EM + ORC + NM, sprich_exp = AM_exp + EM_exp + ORC_exp + NM_exp) %>%
   mutate(AMdiff = AM_exp - AM, EMdiff = EM_exp - EM, ORCdiff = ORC_exp - ORC, NMdiff = NM_exp - NM, sprichdiff = sprich_exp - sprich) %>%
@@ -674,7 +674,7 @@ pred_is.dat.shrink <- readRDS("data/GAMexp_Ext_native_myc_latitude_data_2023.RDS
   left_join(full.dat, by = "entity_ID") 
 
 # version 2; remove negatives: 4% data lost
-pred_is.dat.drop <- readRDS("data/GAMexp_Ext_native_myc_latitude_data_2023.RDS") %>%
+pred_is.dat.drop <- readRDS("data/GAMexp_native_myc_latitude_data_2023.RDS") %>%
   select(-area) %>%
   mutate(sprich = AM + EM + ORC + NM, sprich_exp = AM_exp + EM_exp + ORC_exp + NM_exp) %>%
   mutate(AMdiff = AM_exp - AM, EMdiff = EM_exp - EM, ORCdiff = ORC_exp - ORC, NMdiff = NM_exp - NM, sprichdiff = sprich_exp - sprich) %>%
@@ -695,7 +695,7 @@ pred_is.dat <- pred_is.dat.drop
 
 # write out
 debt <- pred_is.dat.shrink %>% select(c("entity_ID","Tdebt","sprichdiff","dist","area","elev_range","latitude","longitude","abslatitude","sprich_exp", "temp","prec"))
-saveRDS(debt,"data/debt_Ext_native_myc_latitude_data_2023.RDS")
+saveRDS(debt,"data/debt_native_myc_latitude_data_2023.RDS")
 
 pred_is.dat.alld <- pred_is.dat %>% 
   select(c('entity_ID','AMdebt','EMdebt','ORCdebt','NMdebt')) %>%
@@ -757,11 +757,6 @@ lat.dat <- pred_is.dat.all %>%
 lat.cor <- as.matrix(cor(lat.dat))  
 
 mod <- lm(abslatitude ~ area, lat.dat)
-mod <- lm(abslatitude ~ dist, lat.dat)
-mod <- lm(abslatitude ~ elev_range, lat.dat)
-
-summary(mod)
-
 Area.lat.plot <- 
   ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = area), color = "darkgrey") +
   geom_point(alpha = 0.1, size = 5) +
@@ -772,6 +767,7 @@ Area.lat.plot <-
   theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
   ylim(-2,2) 
 
+mod <- lm(abslatitude ~ dist, lat.dat)
 Dist.lat.plot <- 
   ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = dist), color = "darkgrey") +
   geom_point(alpha = 0.1, size = 5) +
@@ -782,6 +778,7 @@ Dist.lat.plot <-
   theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
   ylim(0,2) 
 
+mod <- lm(abslatitude ~ elev_range, lat.dat)
 Elev.lat.plot <- 
   ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = elev_range), color = "darkgrey") +
   geom_point(alpha = 0.1, size = 5) +
@@ -836,9 +833,7 @@ dev.off()
 x_var = pred_is.dat.all$abslatitude
 myc_var= pred_is.dat.all$myctype
 
-# !choose one
 y_var = pred_is.dat.all$debt
-#y_var = pred_is.dat.all$debt.c
 
 df <- data.frame("xvar" = x_var,"yvar" = y_var,"myctype"=myc_var)
 
@@ -865,9 +860,7 @@ aggregated_data <- df %>% group_by(cuts_raw,cuts_labeled,myctype) %>%
          low95CI_y = mean_y-1.96*se_y,
          high95CI_y = mean_y+1.96*se_y)
 
-# !choose one
 debt.aggregated_data <- aggregated_data
-#debtc.aggregated_data <- aggregated_data
 
 ############################
 ######### ONE MODEL ########
@@ -877,14 +870,6 @@ debt.aggregated_data <- aggregated_data
 ######## WITHIN DEBT #######
 ############################
 
-# cbind drop & shrink
-#pred.allcatd <- glm(cbind(diff,obs) ~ abslatitude*myctype + area + dist + elev_range  + prec + (1|entity_ID),family = binomial(link="logit"), data = pred_is.dat.all) 
-#rac <- Spat.cor.rep(pred.allcatd,pred_is.dat.all,2000)
-#pred.allcatd.rac <- glm(cbind(diff,obs) ~ abslatitude*myctype + area + dist +elev_range + prec + rac,family = binomial(link="logit"), data = pred_is.dat.all) 
-#summary(pred.allcatd.rac)
-#anova(pred.allcatd.rac)
-
-# **FINAL**: glm drop & shrink
 pred.allcatd <- glm(debt ~ abslatitude*myctype + area + dist + elev_range  + prec + (1|entity_ID), weights = debt.weights, data = pred_is.dat.all) 
 summary(pred.allcatd)
 rac <- Spat.cor.rep(pred.allcatd,pred_is.dat.all,2000)
@@ -910,13 +895,6 @@ results <- lsmeans::contrast(means,contrasts)
 results.df <- as.data.frame(results)
 results.df
 
-# glm drop & shrink poly
-#pred.allcatd <- glm(debt ~ poly(abslatitude,2,raw = TRUE)*myctype + area + dist +elev_range  + prec + (1|entity_ID),weights = debt.weights, data = pred_is.dat.all) 
-#rac <- Spat.cor.rep(pred.allcatd,pred_is.dat.all,2000)
-#pred.allcatd.rac  <- glm(debt ~ poly(abslatitude,2,raw = TRUE)*myctype + area + dist +elev_range  + prec + rac +(1|entity_ID),weights = debt.weights, data = pred_is.dat.all) 
-#summary(pred.allcatd.rac)
-#anova(pred.allcatd.rac)
-
 # glm diagnostics:
 par(mfrow=c(3,2))
 # homogenetity of variance:
@@ -936,14 +914,6 @@ Check.disp(pred.allcatd.rac, pred_is.dat.all)
 ########## DEBT C ##########
 ############################
 
-# glm drop & shrink
-#pred.allcatcd <- glm(debt.c ~ abslatitude*myctype + area + dist +elev_range  + prec + (1|entity_ID),weights = debt.c.weights, data = pred_is.dat.all) 
-#rac <- Spat.cor.rep(pred.allcatcd,pred_is.dat.all,2000)
-#pred.allcatcd.rac  <- glm(debt.c ~ abslatitude*myctype + area + dist +elev_range  + prec + rac +(1|entity_ID),weights = debt.c.weights, data = pred_is.dat.all) 
-#summary(pred.allcatcd.rac)
-#anova(pred.allcatcd.rac)
-
-# *FINAL*: glm drop & shrink: polynomial
 pred.allcatcd <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*myctype + area + dist + elev_range + prec + (1|entity_ID),weights = debt.c.weights, data = pred_is.dat.all) 
 rac <- Spat.cor.rep(pred.allcatcd,pred_is.dat.all,2000)
 pred.allcatcd.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*myctype + area + dist + elev_range  + prec + rac +(1|entity_ID),weights = debt.c.weights, data = pred_is.dat.all) 
