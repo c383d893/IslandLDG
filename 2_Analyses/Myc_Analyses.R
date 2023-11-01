@@ -259,7 +259,7 @@ lat.mlis_ratio <-
   xlab("Absolute latitude") +
   ylab("island:mainland species richness") +
   theme_classic(base_size = 40) +
-  ylim(0,1) 
+  ylim(0,0.4)
 
 png("figures/Ratio_plot.jpg", width = 10, height = 10, units = 'in', res = 300)
 lat.mlis_ratio
@@ -823,6 +823,82 @@ Deficit.lat.plot <-
 # write out
 png("figures/Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
 Deficit.lat.plot
+dev.off()
+
+############################
+#### DEFICIT PLOT NULL #####
+############################
+
+# island:mainland ratio for each island
+null.deficit.dat <- pred_is.dat.shrink %>%
+  mutate(mlis.ratio = sprich/sprich_exp) 
+
+Deficit.null.lat.plot <-
+  ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
+  geom_point(alpha = 0.8, size = 5, color="coral3") +
+  geom_smooth(method = "loess", color = "coral3", fill = "coral3") +
+  theme_classic(base_size = 40) +
+  ylab("Island:mainland species richness") +
+  xlab("Absolute latitude") +
+  #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
+  coord_cartesian(ylim=c(0,0.7))
+
+# write out
+png("figures/Null_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
+Deficit.null.lat.plot
+dev.off()
+
+################################
+##### CUT DATA DEFICIT PLOT ####
+################################
+
+# set vars
+x_var = null.deficit.dat$abslatitude
+y_var = null.deficit.dat$mlis.ratio
+df <- data.frame("xvar" = x_var,"yvar" = y_var)
+
+# create binned y-values for the x-axis
+quantiles_for_cutting <- quantile(df$xvar,seq(0,1,.10))
+
+# cut the data
+df$cuts_raw <- cut(df$xvar,breaks = quantiles_for_cutting, include.lowest = T)
+
+# calculate the average value within each bin of the x-axis data
+mean_per_cut <- df %>% group_by(cuts_raw) %>%
+  summarize(mean_cut_xval = mean(xvar))
+
+#now use the "mean_per_cut" to define our new cuts
+df$cuts_labeled <- as.numeric(as.character(cut(df$xvar,breaks = quantiles_for_cutting,
+                                               labels = mean_per_cut$mean_cut_xval, include.lowest = T)))
+
+#now calculate the mean response variable values within each bin: 95% CIs assuming a normal distribution here
+aggregated_data <- df %>% group_by(cuts_raw,cuts_labeled) %>%
+  summarize(mean_y = mean(yvar),
+            sd_y = sd(yvar),
+            n_y = length(yvar)) %>%
+  mutate(se_y = sd_y/sqrt(n_y),
+         low95CI_y = mean_y-1.96*se_y,
+         high95CI_y = mean_y+1.96*se_y)
+
+null.deficit.aggregated_data <- aggregated_data
+
+Deficit.null.ag.lat.plot <-
+  ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
+  #geom_point(alpha = 0.3, size = 5, color="coral3") +
+  geom_smooth(method = "loess", color = "coral3", fill = "coral3") +
+  geom_point(data = null.deficit.aggregated_data,aes(x = cuts_labeled-2, y = mean_y),color = "coral3",size = 4,shape = 16, alpha = 0.8) +
+  geom_errorbar(data = null.deficit.aggregated_data,aes(x = cuts_labeled-2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "coral3", width=4,size=2, alpha = 0.8) +
+  theme_classic(base_size = 40) +
+  ylab("Island:mainland species richness") +
+  xlab("Absolute latitude") +
+  #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
+  coord_cartesian(ylim=c(0,0.7))
+
+# write out
+png("figures/Null_Ag_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
+Deficit.null.ag.lat.plot
 dev.off()
 
 ############################
