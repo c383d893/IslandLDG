@@ -859,7 +859,7 @@ y_var = null.deficit.dat$mlis.ratio
 df <- data.frame("xvar" = x_var,"yvar" = y_var)
 
 # create binned y-values for the x-axis
-quantiles_for_cutting <- quantile(df$xvar,seq(0,1,.10))
+quantiles_for_cutting <- quantile(df$xvar,seq(0,1, 1/7))
 
 # cut the data
 df$cuts_raw <- cut(df$xvar,breaks = quantiles_for_cutting, include.lowest = T)
