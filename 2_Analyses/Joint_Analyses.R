@@ -64,19 +64,19 @@ dat <- debt %>%
   #make sum biotic drivers
   #choose one
   #more conservative: average % of species that exhibit one of these syndromes
-  mutate(biotic.ml = (nfix.ml + poll.ml + AM.ml)/3) %>%
+  mutate(biotic.ml.unscaled = (nfix.ml + poll.ml + AM.ml)/3) %>%
   #probability that one of 3 independent events occurred: https://www.omnicalculator.com/statistics/probability-three-events
   #mutate(biotic.ml = nfix.ml + poll.ml + AM.ml - nfix.ml * poll.ml - nfix.ml * AM.ml - poll.ml * AM.ml + nfix.ml * poll.ml * AM.ml) %>%
   #area, dist, elev_range already scaled and log transformed
   mutate(abslatitude = as.vector(scale(abslatitude)), nfix.ml = as.vector(scale(log10((nfix.ml)+.01))),poll.ml = as.vector(scale(log10((poll.ml)+.01))),
        AM.ml = as.vector(scale(log10((AM.ml)+.01))), EM.ml = as.vector(scale(log10((EM.ml)+.01))), ORC.ml = as.vector(scale(log10((ORC.ml)+.01))),
-       biotic.ml = as.vector(scale(log10((biotic.ml)+.01)))) %>%
-  #mutate(abslatitude - as.vector(scale(abslatitude)), nfix.ml = as.vector(scale(logit(nfix.ml))),poll.ml = as.vector(scale(logit(poll.ml))),
-  #     AM.ml = as.vector(scale(logit(AM.ml))), EM.ml = as.vector(scale(logit(EM.ml))), ORC.ml = as.vector(scale(logit(ORC.ml)))) 
+       biotic.ml = (scale(log10((biotic.ml.unscaled)+.01)))) %>%
+  #for effect sizes only:
+  #mutate(abslatitude = abslatitude, nfix.ml = log10((nfix.ml)+.01), poll.ml = log10((poll.ml)+.01),
+  #       AM.ml = log10((AM.ml)+.01), EM.ml = log10((EM.ml)+.01), ORC.ml = log10((ORC.ml)+.01),
+  #       biotic.ml = log10((biotic.ml.unscaled)+.01)) %>%
   drop_na() %>%
   mutate(sprichdiff = ifelse(sprichdiff <0,0, sprichdiff))
-
-dat.br <- dat %>% filter(Tdebt > 0)
 
 ############################
 ######## VAR CORR ##########
@@ -112,70 +112,84 @@ dredged_models <- dredge(sprichdiff.mod.rac)
 averaged_model_results <- model.avg(dredged_models, delta < 4, fit = TRUE)
 
 #examine results
-summary(averaged_model_results)
+summary(averaged_model_results) 
 
 #############################
 ###### MODEL SELECTION ######
 #############################
 
 # add biotic.ml*area
-M1 <- glm(sprichdiff ~ biotic.ml*area + dist +  prec +  abslatitude, data = dat) 
+M1 <- glm(sprichdiff ~ biotic.ml*area + dist +  prec +  elev_range + abslatitude, data = dat) 
 rac <- Spat.cor.rep(M1, dat, 2000)
-M1.rac <- glm(sprichdiff ~ biotic.ml*area + dist + prec + abslatitude + rac, data = dat) 
+M1.rac <- glm(sprichdiff ~ biotic.ml*area + dist + prec + elev_range + abslatitude + rac, data = dat) 
 summary(M1.rac)
 AIC(sprichdiff.mod.rac, M1.rac) #int improves fit
 
 # add biotic.ml*dist
-M2 <- glm(sprichdiff ~  biotic.ml*area + biotic.ml*dist + prec + abslatitude , data = dat) 
+M2 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  elev_range + abslatitude, data = dat) 
 rac <- Spat.cor.rep(M2, dat, 2000)
-M2.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + abslatitude + rac, data = dat) 
+M2.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + elev_range + abslatitude + rac, data = dat) 
 summary(M2.rac)
-AIC(sprichdiff.mod.rac, M2.rac) # int improves fit
+AIC(M1.rac, M2.rac) #int improves fit
 
 # add biotic.ml*prec
-M3 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + biotic.ml*prec + abslatitude, data = dat) 
+M3 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + biotic.ml*prec +  elev_range + abslatitude, data = dat) 
 rac <- Spat.cor.rep(M3, dat, 2000)
-M3.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + biotic.ml*prec + abslatitude + rac, data = dat) 
+M3.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + biotic.ml*prec + elev_range + abslatitude + rac, data = dat) 
 summary(M3.rac)
 AIC(M2.rac, M3.rac) # int DOES NOT improve fit
 
+# add biotic.ml*elev_range
+M4 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  biotic.ml*elev_range + abslatitude, data = dat) 
+rac <- Spat.cor.rep(M4, dat, 2000)
+M4.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + biotic.ml*elev_range + abslatitude + rac, data = dat) 
+summary(M4.rac)
+AIC(M2.rac, M4.rac) # int DOES NOT improve fit
+
 # add biotic.ml*abslatitude
-M3.2 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + biotic.ml*abslatitude, data = dat) 
-rac <- Spat.cor.rep(M3.2, dat, 2000)
-M3.2.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + biotic.ml*abslatitude + rac, data = dat) 
-summary(M3.2.rac)
-AIC(M2.rac, M3.2.rac)  # int DOES NOT improve fit
+M5 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  elev_range + biotic.ml*abslatitude, data = dat) 
+rac <- Spat.cor.rep(M5, dat, 2000)
+M5.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + elev_range + biotic.ml*abslatitude + rac, data = dat) 
+summary(M5.rac)
+AIC(M2.rac, M5.rac) #int improves fit
 
 # add abslatitude*area
-M3.3 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + abslatitude*area, data = dat) 
-rac <- Spat.cor.rep(M3.3, dat, 2000)
-M3.3.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + abslatitude*area + rac, data = dat) 
-summary(M3.3.rac)
-AIC(M2.rac, M3.3.rac) # int DOES NOT improve fit
+M6 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  elev_range + biotic.ml*abslatitude + abslatitude*area, data = dat) 
+rac <- Spat.cor.rep(M6, dat, 2000)
+M6.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + elev_range + biotic.ml*abslatitude + abslatitude*area + rac, data = dat) 
+summary(M6.rac)
+AIC(M5.rac, M6.rac) #int improves fit
 
 # add abslatitude*dist
-M3.4 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + abslatitude*dist, data = dat) 
-rac <- Spat.cor.rep(M3.4, dat, 2000)
-M3.4.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + abslatitude*dist + rac, data = dat) 
-summary(M3.4.rac)
-AIC(M2.rac, M3.4.rac) # int DOES NOT improve fit
+M7 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  elev_range + biotic.ml*abslatitude + abslatitude*area + abslatitude*dist, data = dat) 
+rac <- Spat.cor.rep(M7, dat, 2000)
+M7.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + elev_range + biotic.ml*abslatitude + abslatitude*area + abslatitude*dist + rac, data = dat) 
+summary(M7.rac)
+AIC(M6.rac, M7.rac) # int DOES NOT improve fit
 
 # add abslatitude*prec
-M3.5 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + abslatitude*prec, data = dat) 
-rac <- Spat.cor.rep(M3.5, dat, 2000)
-M3.5.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + abslatitude*prec + rac, data = dat) 
-summary(M3.5.rac)
-AIC(M2.rac, M3.5.rac) # int DOES NOT improve fit
+M8 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  elev_range + biotic.ml*abslatitude + abslatitude*area + abslatitude*prec, data = dat) 
+rac <- Spat.cor.rep(M8, dat, 2000)
+M8.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + elev_range + biotic.ml*abslatitude + abslatitude*area + abslatitude*prec + rac, data = dat) 
+summary(M8.rac)
+AIC(M6.rac, M8.rac) #int improves fit
 
-calc.relimp(M2.rac)
-calc.relimp(M2.rac, rela =TRUE)
+# add abslatitude*elev_range
+M9 <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec +  elev_range + biotic.ml*abslatitude + abslatitude*area + abslatitude*prec + abslatitude*elev_range, data = dat) 
+rac <- Spat.cor.rep(M9, dat, 2000)
+M9.rac <- glm(sprichdiff ~ biotic.ml*area + biotic.ml*dist + prec + elev_range + biotic.ml*abslatitude + abslatitude*area + abslatitude*prec +abslatitude*elev_range+ rac, data = dat) 
+summary(M9.rac)
+AIC(M8.rac, M9.rac) # int DOES NOT improve fit
+
+calc.relimp(M8.rac)
+calc.relimp(M8.rac, rela =TRUE)
 
 ############################
 ########### PLOT ###########
 #### RELATIVE IMPORTANCE ###
 ############################
 
-mod.dat <- calc.relimp(M2.rac)$lmg %>% as.data.frame() %>%
+mod.dat <- calc.relimp(M8.rac)$lmg %>% as.data.frame() %>%
   rownames_to_column(., var = "variable") %>%
   filter(! variable=="rac") %>%
   mutate(variable = case_when(variable=="abslatitude" ~ "Absolute latitude",

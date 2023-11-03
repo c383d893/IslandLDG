@@ -163,6 +163,43 @@ ggplot()+
 dev.off()
 
 ############################
+######## CREATE MAP ########
+########## DIVERSITY #######
+############################
+
+# read world data
+world <- map_data("world")
+
+dat.ml <- dat %>% filter(entity_class2 =="Mainland")
+dat.oi <- dat %>% filter(entity_class2 =="Oceanic")
+dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic")
+
+# write out
+png("figures/Landtype_map_diversity.jpg", width = 8, height = 5, units = 'in', res = 300)
+ggplot()+
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray88", alpha = 0.5) +
+  geom_point(data = dat.ml, 
+             aes(x = longitude, y = latitude, color = factor(sprich), fill = factor(sprich)),  
+             pch = 16, size = 2, alpha = 0.7) +
+  geom_point(data = dat.oi, 
+             aes(x = longitude, y = latitude, color = factor(sprich), fill = factor(sprich)),  
+             pch = 16, size = 2, alpha = 0.7) +
+  geom_point(data = dat.noi, 
+             aes(x = longitude, y = latitude, color = factor(sprich), fill = factor(sprich)),  
+             pch = 16, size = 2, alpha = 0.7) +
+  scale_color_viridis(discrete=TRUE) +
+  xlab("") + ylab ("") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5,size = 30)) +
+  coord_sf(ylim = c(-65, 85), xlim = c(-200, 200), expand = FALSE) +
+  theme(axis.line = element_blank(), axis.ticks = element_blank(), legend.position = "none",
+        axis.text.x = element_blank(), axis.title.x = element_blank())#,
+#axis.text.y = element_blank(), axis.title.y = element_blank() #, 
+#panel.background = element_blank(), panel.border = element_blank(), panel.grid.major = element_blank(),
+#panel.grid.minor = element_blank(), plot.background = element_blank())
+dev.off()
+
+############################
 ######## VAR CORR ##########
 ############################
 
@@ -259,7 +296,8 @@ lat.mlis_ratio <-
   xlab("Absolute latitude") +
   ylab("island:mainland species richness") +
   theme_classic(base_size = 40) +
-  ylim(0,0.4)
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
+  ylim(0,0.5)
 
 png("figures/Ratio_plot.jpg", width = 10, height = 10, units = 'in', res = 300)
 lat.mlis_ratio
@@ -327,22 +365,22 @@ pred.noi <- predict(m1.null.rac,newdata = new.null.dat.noi, type = "response", s
 pred.null <- predict(m1.null.rac,newdata = new.null.dat.null, type = "response", se = TRUE) %>%
   as.data.frame() %>% 
   mutate(abslatitude = new.null.dat.null$abslatitude, entity_class2 = "Null")
-pred.all <- rbind(pred.ml, pred.oi, pred.noi, pred.null) 
+pred.all <- rbind(pred.ml, pred.oi, pred.noi,pred.null) 
 
 # create a custom color scale
 colScale <- scale_colour_manual(values = c("darkseagreen3", "lightgrey","black","cyan4"))
-fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey","black","cyan4"))
+fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey", "black","cyan4"))
 
 lat.landtype.null <- 
   ggplot(data = pred.all,aes(x = abslatitude, y = fit, color = entity_class2, fill = entity_class2))+
   geom_line() +
   geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8) + 
   #remove this for no point version:
-  #geom_point(data = null.dat, mapping = aes(x = abslatitude, y = sprich, color = factor(entity_class2)), alpha = 0.2, size = 5)+ 
+  geom_point(data = null.dat, mapping = aes(x = abslatitude, y = sprich, color = factor(entity_class2)), alpha = 0.2, size = 5)+ 
   xlab("Absolute latitude") +
   ylab("Species richness") +
-  theme_classic(base_size = 40)+
-  ylim(0,500) +
+  theme_classic(base_size = 40) +
+  ylim(0,5500) +
   colScale +
   fillScale +
   #theme(legend.position = 'top') +
@@ -397,6 +435,8 @@ dat2 <-  readRDS("data/native_myc_latitude_data_2023.RDS") %>%
   mutate(elev_range = ifelse(elev_range==0,1, elev_range)) %>%                                   
   mutate(elev_range = ifelse(is.na(elev_range),1, elev_range)) %>%
   filter(area > 6) %>% # based on paper Patrick shared
+  #keep unscaled versions
+  mutate(area.unscaled = area, dist.unscaled = dist, elev_range.unscaled = elev_range, temp.unscaled = temp, prec.unscaled = prec) %>%
   #for models only; remove for figs:
   mutate(area = as.vector(scale(log10((area)+.01))), dist = as.vector(scale(log10((dist)+.01))), elev_range = as.vector(scale(log10((elev_range)+.01))),
          temp = as.vector(scale(temp)), prec = as.vector(scale(log10((prec)+.01)))) %>%
@@ -606,7 +646,7 @@ dev.off()
 ####### ALL ISLANDS ########
 ############################
 
-dat.is.min <- dat %>% filter(entity_class=="Island") %>% select(c('entity_ID',"abslatitude"))
+dat.is.min <- dat %>% filter(entity_class2=="Oceanic") %>% select(c('entity_ID',"abslatitude"))
 
 pred_sprich <- predict.gam(gam.mod_sprich, newdata = dat.is.min, type = "response", se = TRUE) %>%
   as.data.frame() %>%
@@ -634,7 +674,7 @@ pred_NM <- predict.gam(gam.mod.NM,newdata = dat.is.min,type = "response", se = T
 pred_NM_df <- cbind(dat.is.min,pred_NM) %>% rename(NM_exp = fit)
 
 pred_is.dat <- dat %>%
-  filter(entity_class=="Island") %>%
+  filter(entity_class2=="Oceanic") %>%
   left_join(pred_sprich_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_AM_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_EM_df, by= c('entity_ID','abslatitude')) %>%
@@ -658,7 +698,7 @@ saveRDS(pred_is.dat,"data/GAMexp_native_myc_latitude_data_2023.RDS")
 
 # Read data and calc debts
 full.dat <- dat2 %>%
-  select(c("entity_ID", "dist", "area"))
+  select(c("entity_ID", "dist", "area","area.unscaled", "dist.unscaled", "elev_range.unscaled", "temp.unscaled", "prec.unscaled"))
 
 # version 1; debt & C_debt neg to 0, >1 to 1:
 pred_is.dat.shrink <- readRDS("data/GAMexp_native_myc_latitude_data_2023.RDS") %>%
@@ -694,7 +734,7 @@ pred_is.dat <- pred_is.dat.shrink
 pred_is.dat <- pred_is.dat.drop
 
 # write out
-debt <- pred_is.dat.shrink %>% select(c("entity_ID","Tdebt","sprichdiff","dist","area","elev_range","latitude","longitude","abslatitude","sprich_exp", "temp","prec"))
+debt <- pred_is.dat.shrink %>% select(c("entity_ID","Tdebt","sprichdiff","dist","area","elev_range","latitude","longitude","abslatitude","sprich_exp", "temp","prec","area.unscaled", "dist.unscaled", "elev_range.unscaled", "temp.unscaled", "prec.unscaled"))
 saveRDS(debt,"data/debt_native_myc_latitude_data_2023.RDS")
 
 pred_is.dat.alld <- pred_is.dat %>% 
@@ -806,9 +846,6 @@ dev.off()
 ####### DEFICIT PLOT #######
 ############################
 
-mod <- lm(abslatitude ~ sprichdiff, pred_is.dat.all)
-summary(mod)
-
 Deficit.lat.plot <- 
   ggplot(data = pred_is.dat.all, aes(x = abslatitude, y = sprichdiff), color = "coral3", fill="coral3") +
   geom_point(alpha = 0.8, size = 5, color="coral3") +
@@ -831,18 +868,19 @@ dev.off()
 
 # island:mainland ratio for each island
 null.deficit.dat <- pred_is.dat.shrink %>%
-  mutate(mlis.ratio = sprich/sprich_exp) 
+  mutate(mlis.ratio = sprich/sprich_exp) %>%
+  filter(entity_class2=="Oceanic")
 
 Deficit.null.lat.plot <-
   ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
   geom_point(alpha = 0.8, size = 5, color="coral3") +
-  geom_smooth(method = "loess", color = "coral3", fill = "coral3") +
+  geom_smooth(method = "loess", span = 1, color = "coral3", fill = "coral3") +
   theme_classic(base_size = 40) +
   ylab("Island:mainland species richness") +
   xlab("Absolute latitude") +
   #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
   theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
-  coord_cartesian(ylim=c(0,0.7))
+  coord_cartesian(ylim=c(0,0.5))
 
 # write out
 png("figures/Null_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
@@ -859,7 +897,7 @@ y_var = null.deficit.dat$mlis.ratio
 df <- data.frame("xvar" = x_var,"yvar" = y_var)
 
 # create binned y-values for the x-axis
-quantiles_for_cutting <- quantile(df$xvar,seq(0,1, 1/7))
+quantiles_for_cutting <- quantile(df$xvar,seq(0,1,.2))
 
 # cut the data
 df$cuts_raw <- cut(df$xvar,breaks = quantiles_for_cutting, include.lowest = T)
@@ -885,8 +923,8 @@ null.deficit.aggregated_data <- aggregated_data
 
 Deficit.null.ag.lat.plot <-
   ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
-  #geom_point(alpha = 0.3, size = 5, color="coral3") +
-  geom_smooth(method = "loess", color = "coral3", fill = "coral3") +
+  geom_point(alpha = 0.3, size = 5, color="coral3") +
+  geom_smooth(method = "loess", span = 1, color = "coral3", fill = "coral3") +
   geom_point(data = null.deficit.aggregated_data,aes(x = cuts_labeled-2, y = mean_y),color = "coral3",size = 4,shape = 16, alpha = 0.8) +
   geom_errorbar(data = null.deficit.aggregated_data,aes(x = cuts_labeled-2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "coral3", width=4,size=2, alpha = 0.8) +
   theme_classic(base_size = 40) +
@@ -894,12 +932,21 @@ Deficit.null.ag.lat.plot <-
   xlab("Absolute latitude") +
   #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
   theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
-  coord_cartesian(ylim=c(0,0.7))
+  coord_cartesian(ylim=c(0,0.5))
 
 # write out
 png("figures/Null_Ag_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
 Deficit.null.ag.lat.plot
 dev.off()
+
+############################
+##### T-TEST LOW V HIGH ####
+############################
+
+null.deficit.dat.low <- null.deficit.dat %>% filter(abslatitude > 0.238989 & abslatitude < 9.808819) %>% mutate(level="low")
+null.deficit.dat.high <- null.deficit.dat %>% filter(abslatitude > 36.455076 & abslatitude < 71.014732 ) %>% mutate(level="high")
+
+t.test(null.deficit.dat.low$mlis.ratio, null.deficit.dat.high$mlis.ratio)
 
 ############################
 ######### CUT DATA #########
@@ -1200,7 +1247,7 @@ pred.allcatcd.AM <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(absl
 rac <- Spat.cor.rep(pred.allcatcd.AM, pred_is.dat.AM, 2000)
 pred.allcatcd.AM.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac , weights = debt.c.weights, data = pred_is.dat.AM) 
 summary(pred.allcatcd.AM.rac)
-pred.allcatcd.AM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + rac , weights = debt.c.weights, data = pred_is.dat.AM) 
+pred.allcatcd.AM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)+ poly(abslatitude,2,raw = TRUE):area + rac , weights = debt.c.weights, data = pred_is.dat.AM) 
 summary(pred.allcatcd.AM.rac.min)
 
 # EM Poly
@@ -1208,7 +1255,7 @@ pred.allcatcd.EM <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(absl
 rac <- Spat.cor.rep(pred.allcatcd.EM, pred_is.dat.EM, 2000)
 pred.allcatcd.EM.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac, weights = debt.c.weights, data = pred_is.dat.EM) 
 summary(pred.allcatcd.EM.rac)
-pred.allcatcd.EM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist + poly(abslatitude,2,raw = TRUE):prec + rac, weights = debt.c.weights, data = pred_is.dat.EM) 
+pred.allcatcd.EM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE):prec + rac, weights = debt.c.weights, data = pred_is.dat.EM) 
 summary(pred.allcatcd.EM.rac.min)
 
 # ORC Poly
@@ -1216,7 +1263,7 @@ pred.allcatcd.ORC <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abs
 rac <- Spat.cor.rep(pred.allcatcd.ORC, pred_is.dat.ORC, 2000)
 pred.allcatcd.ORC.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac, weights = debt.c.weights, data = pred_is.dat.ORC) 
 summary(pred.allcatcd.ORC.rac)
-pred.allcatcd.ORC.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist + rac, weights = debt.c.weights, data = pred_is.dat.ORC) 
+pred.allcatcd.ORC.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE):area + rac, weights = debt.c.weights, data = pred_is.dat.ORC) 
 summary(pred.allcatcd.ORC.rac.min)
 
 # NM Poly
@@ -1224,5 +1271,5 @@ pred.allcatcd.NM <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(absl
 rac <- Spat.cor.rep(pred.allcatcd.NM, pred_is.dat.NM, 2000)
 pred.allcatcd.NM.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac, weights = debt.c.weights, data = pred_is.dat.NM) 
 summary(pred.allcatcd.NM.rac)
-pred.allcatcd.NM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE) + poly(abslatitude,2,raw = TRUE):dist + poly(abslatitude,2,raw = TRUE):prec + rac, weights = debt.c.weights, data = pred_is.dat.NM) 
+pred.allcatcd.NM.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE):dist + rac, weights = debt.c.weights, data = pred_is.dat.NM) 
 summary(pred.allcatcd.NM.rac.min)

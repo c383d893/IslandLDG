@@ -46,6 +46,7 @@ packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
 packageVersion(c("viridis")) # ‘0.6.2’
 packageVersion(c("tidyverse")) # ‘1.3.2’
+
 ############################
 ###### LOAD FUNCTIONS ######
 ############################
@@ -247,7 +248,7 @@ dev.off()
 ####### ALL ISLANDS ########
 ############################
 
-dat.is.min <- dat %>% filter(entity_class=="Island") %>% select(c('entity_ID',"abslatitude"))
+dat.is.min <- dat %>% filter(entity_class2=="Oceanic") %>% select(c('entity_ID',"abslatitude"))
 
 pred_sprich <- predict.gam(gam.mod_sprich,newdata = dat.is.min,type = "response", se = TRUE) %>%
   as.data.frame() %>%
@@ -265,7 +266,7 @@ pred_nonfix <- predict.gam(gam.mod.nonfix,newdata = dat.is.min,type = "response"
 pred_nonfix_df <- cbind(dat.is.min,pred_nonfix) %>% rename(nonfix_exp = fit)
 
 pred_is.dat <- dat %>%
-  filter(entity_class=="Island") %>%
+  filter(entity_class2=="Oceanic") %>%
   left_join(pred_sprich_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_nfix_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_nonfix_df, by= c('entity_ID','abslatitude')) %>%
@@ -594,7 +595,7 @@ pred.allcatcd.nfix <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE)*area + poly(ab
 rac <- Spat.cor.rep(pred.allcatcd.nfix, pred_is.dat.nfix, 2000)
 pred.allcatcd.nfix.rac  <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac , weights = debt.c.weights, data = pred_is.dat.nfix) 
 summary(pred.allcatcd.nfix.rac)
-pred.allcatcd.nfix.rac.min  <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE):area + rac , weights = debt.c.weights, data = pred_is.dat.nfix) 
+pred.allcatcd.nfix.rac.min  <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE) + poly(abslatitude,3,raw = TRUE):area  + rac , weights = debt.c.weights, data = pred_is.dat.nfix) 
 summary(pred.allcatcd.nfix.rac.min)
 
 # nonfix Poly
@@ -602,5 +603,5 @@ pred.allcatcd.nonfix <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE)*area + poly(
 rac <- Spat.cor.rep(pred.allcatcd.nonfix, pred_is.dat.nonfix, 2000) 
 pred.allcatcd.nonfix.rac  <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE)*area + poly(abslatitude,2,raw = TRUE)*dist +poly(abslatitude,2,raw = TRUE)*elev_range + poly(abslatitude,2,raw = TRUE)*prec + rac , weights = debt.c.weights, data = pred_is.dat.nonfix) 
 summary(pred.allcatcd.nonfix.rac)
-pred.allcatcd.nonfix.rac.min  <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE):area + rac , weights = debt.c.weights, data = pred_is.dat.nonfix) 
+pred.allcatcd.nonfix.rac.min  <- glm(debt.c ~ poly(abslatitude,3,raw = TRUE) + poly(abslatitude,3,raw = TRUE):area + rac , weights = debt.c.weights, data = pred_is.dat.nonfix) 
 summary(pred.allcatcd.nonfix.rac.min)

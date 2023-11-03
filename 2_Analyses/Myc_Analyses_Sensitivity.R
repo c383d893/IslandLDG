@@ -288,7 +288,7 @@ dev.off()
 ####### ALL ISLANDS ########
 ############################
 
-dat.is.min <- dat %>% filter(entity_class=="Island") %>% select(c('entity_ID',"abslatitude"))
+dat.is.min <- dat %>% filter(entity_class2=="Oceanic") %>% select(c('entity_ID',"abslatitude"))
 
 pred_sprich <- predict.gam(gam.mod_sprich, newdata = dat.is.min, type = "response", se = TRUE) %>%
   as.data.frame() %>%
@@ -316,7 +316,7 @@ pred_NM <- predict.gam(gam.mod.NM,newdata = dat.is.min,type = "response", se = T
 pred_NM_df <- cbind(dat.is.min,pred_NM) %>% rename(NM_exp = fit)
 
 pred_is.dat <- dat %>%
-  filter(entity_class=="Island") %>%
+  filter(entity_class2=="Oceanic") %>%
   left_join(pred_sprich_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_AM_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_EM_df, by= c('entity_ID','abslatitude')) %>%

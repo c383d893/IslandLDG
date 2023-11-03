@@ -246,9 +246,7 @@ dev.off()
 ####### ALL ISLANDS ########
 ############################
 
-dat.is.min <- dat %>% filter(entity_class=="Island") %>% select(c('entity_ID',"abslatitude"))
-# expanded version
-#dat.is.min <- dat %>% filter(entity_class=="Island") %>% select(c('entity_ID',"abslatitude","elev_range","area"))
+dat.is.min <- dat %>% filter(entity_class2=="Oceanic") %>% select(c('entity_ID',"abslatitude"))
 
 pred_sprich <- predict.gam(gam.mod_sprich,newdata = dat.is.min,type = "response", se = TRUE) %>%
   as.data.frame() %>%
@@ -266,7 +264,7 @@ pred_poll.ab <- predict.gam(gam.mod.poll.ab,newdata = dat.is.min,type = "respons
 pred_poll.ab_df <- cbind(dat.is.min,pred_poll.ab) %>% rename(poll.ab_exp = fit)
 
 pred_is.dat <- dat %>%
-  filter(entity_class=="Island") %>%
+  filter(entity_class2=="Oceanic") %>%
   left_join(pred_sprich_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_poll.b_df, by= c('entity_ID','abslatitude')) %>%
   left_join(pred_poll.ab_df, by= c('entity_ID','abslatitude')) %>%
@@ -605,4 +603,3 @@ pred.allcatcd.poll.ab.rac  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE)*area +
 summary(pred.allcatcd.poll.ab.rac)
 pred.allcatcd.poll.ab.rac.min  <- glm(debt.c ~ poly(abslatitude,2,raw = TRUE) + rac , weights = debt.c.weights, data = pred_is.dat.poll.ab) 
 summary(pred.allcatcd.poll.ab.rac.min)
-
