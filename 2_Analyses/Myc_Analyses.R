@@ -164,33 +164,34 @@ dev.off()
 
 ############################
 ######## CREATE MAP ########
-########## DIVERSITY #######
+######## DIVERSITY #########
 ############################
 
 # read world data
 world <- map_data("world")
 
 dat.ml <- dat %>% filter(entity_class2 =="Mainland") %>% filter(sprich < 10000)
-dat.oi <- dat %>% filter(entity_class2 =="Oceanic")
-dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic")
+dat.oi <- dat %>% filter(entity_class2 =="Oceanic") %>% filter(sprich < 10000)
+dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic") %>% filter(sprich < 10000)
 
 # write out
 png("figures/Landtype_map_diversity.jpg", width = 8, height = 5, units = 'in', res = 300)
 ggplot()+
-  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray30", alpha = 0.5) +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray20", alpha = 0.5) +
   geom_point(data = dat.ml, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 3, alpha = 0.9) +
+             pch = 16, size = 3, alpha = 0.7) +
   geom_point(data = dat.oi, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 3, alpha = 0.9) +
+             pch = 16, size = 3, alpha = 0.7) +
   geom_point(data = dat.noi, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 3, alpha = 0.9) +
-  scale_color_viridis(option = "A") +
+             pch = 16, size = 3, alpha = 0.7) +
+  scale_color_viridis(option = "A", begin = 0.1, end = 1) +
   xlab("") + ylab ("") +
   theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5,size = 30)) +
   coord_sf(ylim = c(-65, 85), xlim = c(-200, 200), expand = FALSE) +
-  theme(axis.line = element_blank(), axis.ticks = element_blank(), legend.position = "bottom", legend.key.width=unit(1,"cm"),
-        axis.text.x = element_blank(), axis.title.x = element_blank())
+  theme(axis.line = element_blank(), axis.ticks = element_blank(), 
+        legend.position = "bottom", legend.key.width=unit(1,"cm"),
+        axis.text.x = element_blank(), axis.title.x = element_blank()) +
+  labs(color = "Species richness") 
 dev.off()
 
 ############################
@@ -249,7 +250,7 @@ colScale <- scale_colour_manual(values = c("darkseagreen3", "lightgrey","cyan4")
 fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey","cyan4"))
 
 lat.landtype <- 
-  ggplot(data = pred.all,aes(x = abslatitude, y = fit, color = entity_class2, fill = entity_class2))+
+ggplot(data = pred.all,aes(x = abslatitude, y = fit, color = entity_class2, fill = entity_class2))+
   geom_line() +
   geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8) + 
   #remove this for no point version:
@@ -614,7 +615,7 @@ pred.mainland$myctype <- ordered(pred.mainland$myctype, levels = c("AM","EM","NM
 dat.ml.cond$myctype <- ordered(dat.ml.cond$myctype, levels = c("AM","EM","NM"))
 
 lat.myctype <-
-  ggplot(pred.mainland,aes(x =abslatitude,y=fit,color =myctype, fill =myctype))+
+ggplot(pred.mainland,aes(x =abslatitude,y=fit,color =myctype, fill =myctype))+
   geom_line(size=1) +
   geom_point(data=dat.ml.cond, aes(x = abslatitude,y=sprich, color =factor(myctype)), alpha=0.3,size=4)+ 
   geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.5) + 
@@ -863,79 +864,44 @@ dev.off()
 # island:mainland ratio for each island
 null.deficit.dat <- pred_is.dat.shrink %>%
   mutate(mlis.ratio = sprich/sprich_exp) %>%
+  mutate(lg.mlis.ratio = log10(mlis.ratio)) %>%
   filter(entity_class2 == "Oceanic") %>%
   filter(!mlis.ratio > 1)
 
 # model
-ratio.lm <- lm(log(mlis.ratio) ~ abslatitude, data = null.deficit.dat)
+ratio.lm <- lm(lg.mlis.ratio ~ abslatitude, data = null.deficit.dat)
 summary(ratio.lm)
 
-#Deficit.null.lat.plot <-
-ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
+Deficit.null.lat.plot <-
+  ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
   geom_point(alpha = 0.8, size = 5, color="coral3") +
   geom_smooth(method = "lm", span = 1, color = "coral3", fill = "coral3") +
   theme_classic(base_size = 40) +
   ylab("Island:mainland species richness") +
   xlab("Absolute latitude") +
+  scale_y_log10() +
   #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
   theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
-  coord_cartesian(ylim=c(0,0.3))
+  coord_cartesian(ylim=c(0.02,0.3))
+  
+Deficit.null.lat.plot.zoomout <-
+    ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
+    geom_point(alpha = 0.8, size = 5, color="coral3") +
+    geom_smooth(method = "lm", span = 1, color = "coral3", fill = "coral3") +
+    theme_classic(base_size = 40) +
+    ylab("Island:mainland species richness") +
+    xlab("Absolute latitude") +
+    scale_y_log10() +
+    #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+    theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) 
 
 # write out
 png("figures/Null_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
 Deficit.null.lat.plot
 dev.off()
 
-################################
-##### CUT DATA DEFICIT PLOT ####
-################################
-
-# set vars
-x_var = null.deficit.dat$abslatitude
-y_var = null.deficit.dat$mlis.ratio
-df <- data.frame("xvar" = x_var,"yvar" = y_var)
-
-# create binned y-values for the x-axis
-quantiles_for_cutting <- quantile(df$xvar,seq(0,1,.2))
-
-# cut the data
-df$cuts_raw <- cut(df$xvar,breaks = quantiles_for_cutting, include.lowest = T)
-
-# calculate the average value within each bin of the x-axis data
-mean_per_cut <- df %>% group_by(cuts_raw) %>%
-  summarize(mean_cut_xval = mean(xvar))
-
-#now use the "mean_per_cut" to define our new cuts
-df$cuts_labeled <- as.numeric(as.character(cut(df$xvar,breaks = quantiles_for_cutting,
-                                               labels = mean_per_cut$mean_cut_xval, include.lowest = T)))
-
-#now calculate the mean response variable values within each bin: 95% CIs assuming a normal distribution here
-aggregated_data <- df %>% group_by(cuts_raw,cuts_labeled) %>%
-  summarize(mean_y = mean(yvar),
-            sd_y = sd(yvar),
-            n_y = length(yvar)) %>%
-  mutate(se_y = sd_y/sqrt(n_y),
-         low95CI_y = mean_y-1.96*se_y,
-         high95CI_y = mean_y+1.96*se_y)
-
-null.deficit.aggregated_data <- aggregated_data
-
-Deficit.null.ag.lat.plot <-
-  ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
-  geom_point(alpha = 0.3, size = 5, color="coral3") +
-  geom_smooth(method = "loess", span = 1, color = "coral3", fill = "coral3") +
-  geom_point(data = null.deficit.aggregated_data,aes(x = cuts_labeled-2, y = mean_y),color = "coral3",size = 4,shape = 16, alpha = 0.8) +
-  geom_errorbar(data = null.deficit.aggregated_data,aes(x = cuts_labeled-2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "coral3", width=4,size=2, alpha = 0.8) +
-  theme_classic(base_size = 40) +
-  ylab("Island:mainland species richness") +
-  xlab("Absolute latitude") +
-  #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
-  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
-  coord_cartesian(ylim=c(0,0.5))
-
-# write out
-png("figures/Null_Ag_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
-Deficit.null.ag.lat.plot
+png("figures/Null_Lat_deficit_zoom.jpg", width = 10, height = 10, units = 'in', res = 300)
+Deficit.null.lat.plot.zoomout
 dev.off()
 
 ############################
@@ -1091,7 +1057,7 @@ pred.NM <- predict.glm(pred.allcatd.rac,newdata = new.dat.NM, type = "response",
   mutate(abslatitude=new.dat.NM$abslatitude) 
 
 allcatd.plot <- 
-  ggplot() +
+ggplot() +
   #AM section
   geom_line(data = pred.AM, mapping = aes(x = abslatitude, y = fit), color ="royalblue4")+
   geom_ribbon(data = pred.AM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue4", alpha = 0.5) +
@@ -1192,7 +1158,7 @@ pred.NM <- predict.glm(pred.allcatcd.rac,newdata = new.dat.NM, type = "response"
   mutate(abslatitude=new.dat.NM$abslatitude) 
 
 allcatcd.plot <- 
-  ggplot() +
+ggplot() +
   #AM section
   geom_line(data = pred.AM, mapping = aes(x = abslatitude, y = fit), color ="royalblue4")+
   geom_ribbon(data = pred.AM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue4", alpha= 0.5) +
