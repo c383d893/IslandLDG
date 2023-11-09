@@ -177,14 +177,14 @@ dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic") %>% filter(sprich < 100
 # write out
 png("figures/Landtype_map_diversity.jpg", width = 8, height = 5, units = 'in', res = 300)
 ggplot()+
-  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray20", alpha = 0.5) +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray10", alpha = 0.5) +
   geom_point(data = dat.ml, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 3, alpha = 0.7) +
+             pch = 16, size = 2, alpha = 0.7) +
   geom_point(data = dat.oi, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 3, alpha = 0.7) +
-  geom_point(data = dat.noi, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 3, alpha = 0.7) +
-  scale_color_viridis(option = "A", begin = 0.1, end = 1) +
+             pch = 16, size = 2, alpha = 0.7, stroke = 1.25) +
+  #geom_point(data = dat.noi, aes(x = longitude, y = latitude, color = sprich),  
+  #           pch = 16, size = 2, alpha = 0.8) +
+  scale_color_viridis(option = "A", begin = 0.3, end = 1) +
   xlab("") + ylab ("") +
   theme_minimal() +
   coord_sf(ylim = c(-65, 85), xlim = c(-200, 200), expand = FALSE) +
@@ -289,7 +289,7 @@ lat.mlis_ratio <-
   ggplot(data = mlis_ratio, aes(x = abslatitude, y = ratio), color = "black", fill = "black")+
   geom_line() +
   xlab("Absolute latitude") +
-  ylab("island:mainland species richness") +
+  ylab("Island:mainland species richness") +
   theme_classic(base_size = 40) +
   theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
   ylim(0,0.5)
@@ -873,6 +873,18 @@ ratio.lm <- lm(lg.mlis.ratio ~ abslatitude, data = null.deficit.dat)
 summary(ratio.lm)
 
 Deficit.null.lat.plot <-
+    ggplot(data = null.deficit.dat, aes(x = abslatitude, y = 1-mlis.ratio), color = "coral3", fill="coral3") +
+    geom_point(alpha = 0.8, size = 5, color="coral3") +
+    geom_smooth(method = "lm", span = 1, color = "coral3", fill = "coral3") +
+    theme_classic(base_size = 40) +
+    ylab("Proportional island species deficit \n (1-island:mainland species richness)") +
+    xlab("Absolute latitude") +
+    scale_y_log10() +
+    #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
+    theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
+    ylim(0.75,1.025)
+
+Deficit.null.lat.plot.zoom <-
   ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
   geom_point(alpha = 0.8, size = 5, color="coral3") +
   geom_smooth(method = "lm", span = 1, color = "coral3", fill = "coral3") +
@@ -881,27 +893,15 @@ Deficit.null.lat.plot <-
   xlab("Absolute latitude") +
   scale_y_log10() +
   #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
-  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) +
-  coord_cartesian(ylim=c(0.02,0.3))
-  
-Deficit.null.lat.plot.zoomout <-
-    ggplot(data = null.deficit.dat, aes(x = abslatitude, y = mlis.ratio), color = "coral3", fill="coral3") +
-    geom_point(alpha = 0.8, size = 5, color="coral3") +
-    geom_smooth(method = "lm", span = 1, color = "coral3", fill = "coral3") +
-    theme_classic(base_size = 40) +
-    ylab("Island:mainland species richness") +
-    xlab("Absolute latitude") +
-    scale_y_log10() +
-    #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
-    theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) 
+  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) 
 
 # write out
-png("figures/Null_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
+png("figures/Null_Lat_deficit.jpg", width = 11, height = 10, units = 'in', res = 300)
 Deficit.null.lat.plot
 dev.off()
 
-png("figures/Null_Lat_deficit_zoom.jpg", width = 10, height = 10, units = 'in', res = 300)
-Deficit.null.lat.plot.zoomout
+png("figures/Null_Lat_deficit.zoom.jpg", width = 10.5, height = 10, units = 'in', res = 300)
+Deficit.null.lat.plot.zoom
 dev.off()
 
 ############################
