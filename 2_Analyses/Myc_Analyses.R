@@ -178,20 +178,22 @@ dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic") %>% filter(sprich < 100
 png("figures/Landtype_map_diversity.jpg", width = 8, height = 5, units = 'in', res = 300)
 ggplot()+
   geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray10", alpha = 0.5) +
-  geom_point(data = dat.ml, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 2, alpha = 0.7) +
-  geom_point(data = dat.oi, aes(x = longitude, y = latitude, color = sprich),  
-             pch = 16, size = 2, alpha = 0.7, stroke = 1.25) +
+  geom_point(data = dat.ml, aes(x = longitude, y = latitude, color = sprich, size = sprich),  
+             pch = 19, alpha = 0.8, stroke = 0) +
+  geom_point(data = dat.oi, aes(x = longitude, y = latitude, color = sprich, size = sprich),  
+             pch = 19, alpha = 0.8, stroke = 0) +
   #geom_point(data = dat.noi, aes(x = longitude, y = latitude, color = sprich),  
   #           pch = 16, size = 2, alpha = 0.8) +
-  scale_color_viridis(option = "A", begin = 0.3, end = 1) +
+  scale_color_viridis(option = "A", begin = 0.15, end = 1) +
+  scale_size_continuous(range = c(2, 7)) +
   xlab("") + ylab ("") +
   theme_minimal() +
   coord_sf(ylim = c(-65, 85), xlim = c(-200, 200), expand = FALSE) +
   theme(axis.line = element_blank(), axis.ticks = element_blank(), 
-        legend.position = "bottom", legend.key.width=unit(1,"cm"),
+        legend.position = "bottom", legend.key.width = unit(1,"cm"),
         axis.text.x = element_blank(), axis.title.x = element_blank()) +
-  labs(color = "Species richness") 
+  labs(color = "Species richness") +
+  guides(size = "none")
 dev.off()
 
 ############################
