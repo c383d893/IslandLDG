@@ -40,7 +40,6 @@ packageVersion(c("ape")) # ‘5.6.2’
 packageVersion(c("sjPlot")) # ‘2.8.12’
 packageVersion(c("gridExtra")) # '2.3'
 packageVersion(c("MuMIn")) # ‘1.47.1’
-packageVersion(c("tidyverse")) #  ‘1.3.2’
 packageVersion(c("maps")) # ‘3.4.1’
 packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
@@ -171,21 +170,28 @@ dev.off()
 world <- map_data("world")
 
 dat.ml <- dat %>% filter(entity_class2 =="Mainland") %>% filter(sprich < 10000)
-dat.oi <- dat %>% filter(entity_class2 =="Oceanic") %>% filter(sprich < 10000)
-dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic") %>% filter(sprich < 10000)
+dat.oi <- dat %>% filter(entity_class2 =="Oceanic") %>% filter(sprich < 10000) 
+dat.noi <- dat %>% filter(entity_class2 =="Non-oceanic") %>% filter(sprich < 10000) 
+
+dat.fig1b <- rbind(dat.ml, dat.oi)
+write.csv(dat.fig1b, "data/source_fig1b.csv")
 
 # write out
 png("figures/Landtype_map_diversity.jpg", width = 8, height = 5, units = 'in', res = 300)
 ggplot()+
-  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray10", alpha = 0.5) +
-  geom_point(data = dat.ml, aes(x = longitude, y = latitude, color = sprich, size = sprich),  
-             pch = 19, alpha = 0.8, stroke = 0) +
-  geom_point(data = dat.oi, aes(x = longitude, y = latitude, color = sprich, size = sprich),  
-             pch = 19, alpha = 0.8, stroke = 0) +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "gray30", alpha = 0.5) +
+  geom_point(data = dat.ml, aes(x = longitude, y = latitude, color = sprich, fill = sprich, size = sprich),  
+             pch = 21, stroke = 1) +
+  geom_point(data = dat.oi, aes(x = longitude, y = latitude, color = sprich, fill = sprich, size = sprich),  
+             pch = 1, stroke = 2) +
+  geom_jitter()+
   #geom_point(data = dat.noi, aes(x = longitude, y = latitude, color = sprich),  
   #           pch = 16, size = 2, alpha = 0.8) +
-  scale_color_viridis(option = "A", begin = 0.15, end = 1) +
-  scale_size_continuous(range = c(2, 7)) +
+  #scale_color_viridis(option = "mako", begin = 0, end = 1, alpha = 0.7) +
+  #scale_fill_viridis(option = "mako", begin = 0, end = 1, alpha = 0.3) +
+  scale_color_viridis(begin = 0.3, end = 1, alpha = 0.75) +
+  scale_fill_viridis(begin = 0.3, end = 1, alpha = 0.5) +
+  scale_size_continuous(range = c(1, 8)) +
   xlab("") + ylab ("") +
   theme_minimal() +
   coord_sf(ylim = c(-65, 85), xlim = c(-200, 200), expand = FALSE) +
@@ -193,7 +199,8 @@ ggplot()+
         legend.position = "bottom", legend.key.width = unit(1,"cm"),
         axis.text.x = element_blank(), axis.title.x = element_blank()) +
   labs(color = "Species richness") +
-  guides(size = "none")
+  guides(size = "none") 
+  
 dev.off()
 
 ############################
@@ -222,6 +229,9 @@ vif(m1.rac)
 # find simple slope by entity_class2:
 # default link logit
 emtrends(m1.rac, ~ entity_class2, var="abslatitude")
+
+dat.fig1a <- dat
+write.csv(dat.fig1a, "data/source_fig1a.csv")
 
 ############################
 ########### PLOT ###########
@@ -300,6 +310,9 @@ png("figures/Ratio_plot.jpg", width = 10, height = 10, units = 'in', res = 300)
 lat.mlis_ratio
 dev.off()
 
+dat.figed2a <- mlis_ratio
+write.csv(dat.figed2a, "data/source_figed2a.csv")
+
 #################################
 ######## V2. NULL ISLAND ########
 #################################
@@ -334,62 +347,6 @@ vif(m1.null.rac)
 # find simple slope by entity_class2:
 # default link logit
 emtrends(m1.null.rac, ~ entity_class2, var="abslatitude")
-
-############################
-########### PLOT ###########
-##### LAT BY LAND TYPE #####
-############################
-
-new.null.dat.ml <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
-  mutate(entity_class2 = "Mainland", rac = mean(rac))
-new.null.dat.oi <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
-  mutate(entity_class2 = "Oceanic", rac = mean(rac))
-new.null.dat.noi <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
-  mutate(entity_class2 = "Non-oceanic", rac = mean(rac))
-new.null.dat.null <- with(null.dat, expand.grid(abslatitude = seq(min(abslatitude), max(abslatitude), length = 1000))) %>% 
-  mutate(entity_class2 = "Null", rac = mean(rac))
-new.null.dat <- rbind(new.null.dat.ml, new.null.dat.oi, new.null.dat.noi, new.null.dat.null) 
-
-pred.ml <- predict(m1.null.rac, newdata = new.null.dat.ml, type = "response", se = TRUE) %>%
-  as.data.frame() %>% 
-  mutate(abslatitude = new.null.dat.ml$abslatitude, entity_class2 = "Mainland")
-pred.oi <- predict(m1.null.rac,newdata = new.null.dat.oi, type = "response", se = TRUE) %>%
-  as.data.frame() %>% 
-  mutate(abslatitude = new.null.dat.oi$abslatitude, entity_class2 = "Oceanic")
-pred.noi <- predict(m1.null.rac,newdata = new.null.dat.noi, type = "response", se = TRUE) %>%
-  as.data.frame() %>% 
-  mutate(abslatitude = new.null.dat.noi$abslatitude, entity_class2 = "Non-oceanic")
-pred.null <- predict(m1.null.rac,newdata = new.null.dat.null, type = "response", se = TRUE) %>%
-  as.data.frame() %>% 
-  mutate(abslatitude = new.null.dat.null$abslatitude, entity_class2 = "Null")
-pred.all <- rbind(pred.ml, pred.oi, pred.noi,pred.null) 
-
-# create a custom color scale
-colScale <- scale_colour_manual(values = c("darkseagreen3", "lightgrey","black","cyan4"))
-fillScale <- scale_fill_manual(values = c("darkseagreen3", "lightgrey", "black","cyan4"))
-
-lat.landtype.null <- 
-  ggplot(data = pred.all,aes(x = abslatitude, y = fit, color = entity_class2, fill = entity_class2))+
-  geom_line() +
-  geom_ribbon(aes(ymin = fit-se.fit, ymax = fit+se.fit), alpha = 0.8) + 
-  #remove this for no point version:
-  geom_point(data = null.dat, mapping = aes(x = abslatitude, y = sprich, color = factor(entity_class2)), alpha = 0.2, size = 5)+ 
-  xlab("Absolute latitude") +
-  ylab("Species richness") +
-  theme_classic(base_size = 40) +
-  ylim(0,5500) +
-  colScale +
-  fillScale +
-  #theme(legend.position = 'top') +
-  theme(legend.justification=c(1,1), legend.position=c(1,1))+
-  guides(fill = FALSE) +
-  guides(color = guide_legend(title = "Land Type", override.aes = list(fill = NA, linetype = c(0, 0, 0, 0))))+
-  theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30))
-
-# with non-oceanic
-png("figures/Myc_LatbyLandType_4type.jpg", width = 10, height = 10, units = 'in', res = 300)
-lat.landtype.null
-dev.off()
 
 ############################
 ######### MAINLAND #########
@@ -607,8 +564,8 @@ dat.ml.cond <- dat.ml %>%
   gather(key="myctype", value="sprich", AM,EM,NM) 
 
 # create a custom color scale
-colScale <- scale_colour_manual(values=c("royalblue4", "royalblue3","darkgrey"))
-fillScale <- scale_fill_manual(values=c("royalblue4", "royalblue3","darkgrey"))
+colScale <- scale_colour_manual(values=c("royalblue4", "royalblue2","darkgrey"))
+fillScale <- scale_fill_manual(values=c("royalblue4", "royalblue2","darkgrey"))
 
 #pred.mainland$myctype <- ordered(pred.mainland$myctype, levels = c("AM","EM","ORC","NM"))
 #dat.ml.cond$myctype <- ordered(dat.ml.cond$myctype, levels = c("AM","EM","ORC","NM"))
@@ -637,6 +594,9 @@ ggplot(pred.mainland,aes(x =abslatitude,y=fit,color =myctype, fill =myctype))+
 png("figures/Myc_LatbyMycType.jpg", width=10, height= 10, units='in', res=300)
 lat.myctype
 dev.off()
+
+dat.fig4c <- pred.mainland
+write.csv(dat.fig4c, "data/source_fig4c.csv")
 
 ############################
 ###### PREDICT EXP IS ######
@@ -784,6 +744,24 @@ pred_is.dat.all <- pred_is.dat.all.diff %>%
 
 pred_is.dat.all <- within(pred_is.dat.all, myctype <- relevel(myctype, ref = "NM"))
 
+dat.fig2b <- pred_is.dat.all
+write.csv(dat.fig2b, "data/source_fig2b.csv")
+
+dat.fig3b <- pred_is.dat.all
+write.csv(dat.fig3b, "data/source_fig3b.csv")
+
+dat.fig4d <- pred_is.dat.all
+write.csv(dat.fig4d, "data/source_fig4d.csv")
+
+dat.figed1a <- pred_is.dat.all
+write.csv(dat.figed1a, "data/source_figed1a.csv")
+
+dat.figed1b <- pred_is.dat.all
+write.csv(dat.figed1b, "data/source_figed1b.csv")
+
+dat.figed1c <- pred_is.dat.all
+write.csv(dat.figed1c, "data/source_figed1c.csv")
+
 ############################
 #### LAT RELATIONSHIPS #####
 ############################
@@ -879,7 +857,7 @@ Deficit.null.lat.plot <-
     geom_point(alpha = 0.8, size = 5, color="coral3") +
     geom_smooth(method = "lm", span = 1, color = "coral3", fill = "coral3") +
     theme_classic(base_size = 40) +
-    ylab("Proportional island species deficit \n (1-island:mainland species richness)") +
+    ylab("Proportional island species deficit") +
     xlab("Absolute latitude") +
     scale_y_log10() +
     #theme(legend.position = "none", axis.text.y = element_text(angle = 45)) +
@@ -898,13 +876,19 @@ Deficit.null.lat.plot.zoom <-
   theme(axis.text.x = element_text(size = 30),axis.text.y = element_text(angle = 45, size = 30)) 
 
 # write out
-png("figures/Null_Lat_deficit.jpg", width = 11, height = 10, units = 'in', res = 300)
+png("figures/Null_Lat_deficit.jpg", width = 10, height = 10, units = 'in', res = 300)
 Deficit.null.lat.plot
 dev.off()
 
-png("figures/Null_Lat_deficit.zoom.jpg", width = 10.5, height = 10, units = 'in', res = 300)
+png("figures/Null_Lat_deficit.zoom.jpg", width = 10, height = 10, units = 'in', res = 300)
 Deficit.null.lat.plot.zoom
 dev.off()
+
+dat.fig2a <- null.deficit.dat
+write.csv(dat.fig2a, "data/source_fig2a.csv")
+
+dat.figed2b <- null.deficit.dat
+write.csv(dat.figed2b, "data/source_figed2b.csv")
 
 ############################
 ##### T-TEST LOW V HIGH ####
@@ -1067,11 +1051,11 @@ ggplot() +
   geom_point(data = debt.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled-2, y = mean_y),color = "royalblue4",size = 4,shape = 16, alpha = 0.8) +
   geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled-2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue4", width=4,size=2, alpha = 0.8) +
   #EM section
-  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
-  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha = 0.5) +
-  #geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt),color ="royalblue3", alpha= 0.3, size=5) +
-  geom_point(data = debt.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled+2, y = mean_y),color = "royalblue3",size = 4,shape = 16, alpha = 0.8) +
-  geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled+2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue3", width=4,size=2, alpha = 0.8) +
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue2")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue2", alpha = 0.5) +
+  #geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt),color ="royalblue2", alpha= 0.3, size=5) +
+  geom_point(data = debt.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled+2, y = mean_y),color = "royalblue2",size = 4,shape = 16, alpha = 0.8) +
+  geom_errorbar(data = debt.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled+2, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue2", width=4,size=2, alpha = 0.8) +
   #ORC section
   #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
   #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha = 0.5) +
@@ -1102,9 +1086,9 @@ allcatd.plot.points <-
   geom_ribbon(data = pred.AM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue4", alpha = 0.5) +
   geom_point(data = pred_is.dat.all %>% filter(myctype=="AM"), aes(x = abslatitude, y=debt),color ="royalblue4", alpha= 0.3, size=5) +
   #EM section
-  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
-  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha = 0.5) +
-  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt),color ="royalblue3", alpha= 0.3, size=5) +
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue2")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue2", alpha = 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt),color ="royalblue2", alpha= 0.3, size=5) +
   #ORC section
   #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
   #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha = 0.5) +
@@ -1168,11 +1152,11 @@ ggplot() +
   #geom_point(data = debtc.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue4",size = 1,shape = 15) +
   #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue4", width=3,size=1.5) +
   #EM section
-  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
-  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha= 0.5) +
-  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt.c),color ="royalblue3", alpha= 0.3, size=2) +
-  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue3",size = 1,shape = 15) +
-  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue3", width=3,size=1.5) +
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue2")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue2", alpha= 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt.c),color ="royalblue2", alpha= 0.3, size=2) +
+  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue2",size = 1,shape = 15) +
+  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue2", width=3,size=1.5) +
   #ORC section
   #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
   #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha= 0.5) +

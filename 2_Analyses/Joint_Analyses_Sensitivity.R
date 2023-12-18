@@ -2,8 +2,51 @@
 ###### LOAD PACKAGES #######
 ############################
 
-library(mgcv); library(gridExtra); library(betareg); library(MASS); library(lme4); library(lmerTest); library(lsmeans); library(ggeffects); library(spdep); library(ggplot2); library(ncf); library(ape); library(sjPlot); library(gridExtra); library(MuMIn); library(tidyverse); library(maps); library(sf); library(tidyverse); library(relaimpo)
+library(mgcv); 
+library(gridExtra); 
+library(betareg); 
+library(MASS); 
+library(lme4); 
+library(lmerTest); 
+library(lsmeans); 
+library(ggeffects); 
+library(spdep); 
+library(ggplot2); 
+library(ncf); 
+library(ape); 
+library(sjPlot); 
+library(gridExtra); 
+library(MuMIn); 
+library(tidyverse); 
+library(maps); 
+library(sf); 
+library(car);
+library(tidyverse); 
+library(relaimpo)
+
 options(na.action = "na.fail")
+
+packageVersion(c("mgcv")) #‘1.8.41’
+packageVersion(c("gridExtra")) # ‘2.3’
+packageVersion(c("betareg")) # ‘3.1.4’
+packageVersion(c("MASS")) # ‘7.3.58.1’
+packageVersion(c("lme4")) # ‘1.1.31’
+packageVersion(c("lmerTest")) # ‘3.1.3’
+packageVersion(c("lsmeans")) # ‘2.30.0’
+packageVersion(c("ggeffects")) # ‘1.1.4’
+packageVersion(c("spdep")) # ‘1.2.7’
+packageVersion(c("ggplot2")) #'3.4.0'
+packageVersion(c("ncf")) # ‘1.3.2’
+packageVersion(c("ape")) # ‘5.6.2’
+packageVersion(c("sjPlot")) # ‘2.8.12’
+packageVersion(c("gridExtra")) # '2.3'
+packageVersion(c("MuMIn")) # ‘1.47.1’
+packageVersion(c("maps")) # ‘3.4.1’
+packageVersion(c("sf")) # ‘1.0.9’
+packageVersion(c("car")) # ‘3.1.1’
+packageVersion(c("viridis")) # ‘0.6.2’
+packageVersion(c("tidyverse")) # ‘1.3.2’
+packageVersion(c("relaimpo")) # ‘2.2.7’
 
 ############################
 ###### LOAD FUNCTIONS ######

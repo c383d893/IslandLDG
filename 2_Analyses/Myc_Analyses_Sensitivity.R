@@ -40,7 +40,6 @@ packageVersion(c("ape")) # ‘5.6.2’
 packageVersion(c("sjPlot")) # ‘2.8.12’
 packageVersion(c("gridExtra")) # '2.3'
 packageVersion(c("MuMIn")) # ‘1.47.1’
-packageVersion(c("tidyverse")) #  ‘1.3.2’
 packageVersion(c("maps")) # ‘3.4.1’
 packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
@@ -252,8 +251,8 @@ dat.ml.cond <- dat.ml %>%
   gather(key="myctype", value="sprich", AM,EM,NM) 
 
 # create a custom color scale
-colScale <- scale_colour_manual(values=c("royalblue4", "royalblue3","darkgrey"))
-fillScale <- scale_fill_manual(values=c("royalblue4", "royalblue3","darkgrey"))
+colScale <- scale_colour_manual(values=c("royalblue4", "royalblue2","darkgrey"))
+fillScale <- scale_fill_manual(values=c("royalblue4", "royalblue2","darkgrey"))
 
 #pred.mainland$myctype <- ordered(pred.mainland$myctype, levels = c("AM","EM","ORC","NM"))
 #dat.ml.cond$myctype <- ordered(dat.ml.cond$myctype, levels = c("AM","EM","ORC","NM"))
@@ -282,6 +281,9 @@ ggplot(pred.mainland,aes(x =abslatitude,y=fit,color =myctype, fill =myctype))+
 png("figures/Sensitivity_Myc_LatbyMycType.jpg", width=10, height= 10, units='in', res=300)
 lat.myctype
 dev.off()
+
+dat.figed5c <- pred.mainland
+write.csv(dat.figed5c, "data/source_figed5c.csv")
 
 ############################
 ###### PREDICT EXP IS ######
@@ -415,6 +417,12 @@ pred_is.dat.all <- pred_is.dat.all.diff %>%
 
 pred_is.dat.all <- within(pred_is.dat.all, myctype <- relevel(myctype, ref = "NM"))
 
+dat.figed4b <- pred_is.dat.all
+write.csv(dat.figed4b, "data/source_figed4b.csv")
+
+dat.figed5d <- pred_is.dat.all
+write.csv(dat.figed5d, "data/source_figed5d.csv")
+
 ############################
 ######### ONE MODEL ########
 ############################
@@ -485,11 +493,11 @@ ggplot() +
   #geom_point(data = debtc.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue4",size = 1,shape = 15) +
   #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="AM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue4", width=3,size=1.5) +
   #EM section
-  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue3")+
-  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue3", alpha= 0.5) +
-  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt.c),color ="royalblue3", alpha= 0.3, size=2) +
-  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue3",size = 1,shape = 15) +
-  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue3", width=3,size=1.5) +
+  geom_line(data = pred.EM, mapping = aes(x = abslatitude, y = fit), color ="royalblue2")+
+  geom_ribbon(data = pred.EM, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "royalblue2", alpha= 0.5) +
+  geom_point(data = pred_is.dat.all %>% filter(myctype=="EM"), aes(x = abslatitude, y=debt.c),color ="royalblue2", alpha= 0.3, size=2) +
+  #geom_point(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y),color = "royalblue2",size = 1,shape = 15) +
+  #geom_errorbar(data = debtc.aggregated_data %>% filter(myctype=="EM"),aes(x = cuts_labeled, y = mean_y, ymin = low95CI_y,ymax =high95CI_y),color = "royalblue2", width=3,size=1.5) +
   #ORC section
   #geom_line(data = pred.ORC, mapping = aes(x = abslatitude, y = fit), color ="darkorchid3")+
   #geom_ribbon(data = pred.ORC, aes(x = abslatitude, ymin=fit-se.fit, ymax = fit + se.fit), fill = "darkorchid3", alpha= 0.5) +

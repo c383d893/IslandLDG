@@ -40,7 +40,6 @@ packageVersion(c("ape")) # ‘5.6.2’
 packageVersion(c("sjPlot")) # ‘2.8.12’
 packageVersion(c("gridExtra")) # '2.3'
 packageVersion(c("MuMIn")) # ‘1.47.1’
-packageVersion(c("tidyverse")) #  ‘1.3.2’
 packageVersion(c("maps")) # ‘3.4.1’
 packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
@@ -241,6 +240,9 @@ png("figures/Poll_LatbyPollType.jpg", width=10, height= 10, units='in', res=300)
 lat.polltype
 dev.off()
 
+dat.fig4a <- pred.mainland
+write.csv(dat.fig4a, "data/source_fig4a.csv")
+
 ############################
 ###### PREDICT EXP IS ######
 ####### ALL ISLANDS ########
@@ -359,6 +361,12 @@ pred_is.dat.all <- pred_is.dat.all.diff %>%
   mutate(poll = as.factor(poll)) 
   
 pred_is.dat.all <- within(pred_is.dat.all, poll <- relevel(poll, ref = "poll.ab"))
+
+dat.fig3a <- pred_is.dat.all
+write.csv(dat.fig3a, "data/source_fig3a.csv")
+
+dat.fig4b <- pred_is.dat.all
+write.csv(dat.fig4b, "data/source_fig4b.csv")
 
 ############################
 ######### CUT DATA #########

@@ -40,7 +40,6 @@ packageVersion(c("ape")) # ‘5.6.2’
 packageVersion(c("sjPlot")) # ‘2.8.12’
 packageVersion(c("gridExtra")) # '2.3'
 packageVersion(c("MuMIn")) # ‘1.47.1’
-packageVersion(c("tidyverse")) #  ‘1.3.2’
 packageVersion(c("maps")) # ‘3.4.1’
 packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
@@ -243,6 +242,9 @@ png("figures/Nfix_Latbynfixtype.jpg", width=10, height= 10, units='in', res=300)
 lat.nfixtype
 dev.off()
 
+dat.fig4e <- pred.mainland
+write.csv(dat.fig4e, "data/source_fig4e.csv")
+
 ############################
 ###### PREDICT EXP IS ######
 ####### ALL ISLANDS ########
@@ -361,6 +363,12 @@ pred_is.dat.all <- pred_is.dat.all.diff %>%
   mutate(nfix = as.factor(nfix))
 
 pred_is.dat.all <- within(pred_is.dat.all, nfix <- relevel(nfix, ref = "nonfix"))
+
+dat.fig3c <- pred_is.dat.all
+write.csv(dat.fig3c, "data/source_fig3c.csv")
+
+dat.fig4f <- pred_is.dat.all
+write.csv(dat.fig4f, "data/source_fig4f.csv")
 
 ############################
 ######### CUT DATA #########

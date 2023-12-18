@@ -40,7 +40,6 @@ packageVersion(c("ape")) # ‘5.6.2’
 packageVersion(c("sjPlot")) # ‘2.8.12’
 packageVersion(c("gridExtra")) # '2.3'
 packageVersion(c("MuMIn")) # ‘1.47.1’
-packageVersion(c("tidyverse")) #  ‘1.3.2’
 packageVersion(c("maps")) # ‘3.4.1’
 packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
@@ -247,6 +246,9 @@ png("figures/Sensitivity_Poll_LatbyPollType.jpg", width=10, height= 10, units='i
 lat.polltype
 dev.off()
 
+dat.figed5a <- pred.mainland
+write.csv(dat.figed5a, "data/source_figed5a.csv")
+
 ############################
 ###### PREDICT EXP IS ######
 ####### ALL ISLANDS ########
@@ -351,6 +353,12 @@ pred_is.dat.all <- pred_is.dat.all.diff %>%
   mutate(poll = as.factor(poll)) 
   
 pred_is.dat.all <- within(pred_is.dat.all, poll <- relevel(poll, ref = "poll.ab"))
+
+dat.figed4a <- pred_is.dat.all
+write.csv(dat.figed4a, "data/source_figed4a.csv")
+
+dat.figed5b <- pred_is.dat.all
+write.csv(dat.figed5b, "data/source_figed5a.csv")
 
 ############################
 ######### ONE MODEL ########

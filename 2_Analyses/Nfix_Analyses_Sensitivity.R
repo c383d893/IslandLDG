@@ -40,12 +40,12 @@ packageVersion(c("ape")) # ‘5.6.2’
 packageVersion(c("sjPlot")) # ‘2.8.12’
 packageVersion(c("gridExtra")) # '2.3'
 packageVersion(c("MuMIn")) # ‘1.47.1’
-packageVersion(c("tidyverse")) #  ‘1.3.2’
 packageVersion(c("maps")) # ‘3.4.1’
 packageVersion(c("sf")) # ‘1.0.9’
 packageVersion(c("car")) # ‘3.1.1’
 packageVersion(c("viridis")) # ‘0.6.2’
 packageVersion(c("tidyverse")) # ‘1.3.2’
+
 ############################
 ###### LOAD FUNCTIONS ######
 ############################
@@ -248,6 +248,9 @@ png("figures/Sensitivity_Nfix_Latbynfixtype.jpg", width=10, height= 10, units='i
 lat.nfixtype
 dev.off()
 
+dat.figed5e <- pred.mainland
+write.csv(dat.figed5e, "data/source_figed5e.csv")
+
 ############################
 ###### PREDICT EXP IS ######
 ####### ALL ISLANDS ########
@@ -352,6 +355,12 @@ pred_is.dat.all <- pred_is.dat.all.diff %>%
   mutate(nfix = as.factor(nfix))
 
 pred_is.dat.all <- within(pred_is.dat.all, nfix <- relevel(nfix, ref = "nonfix"))
+
+dat.figed4c <- pred_is.dat.all
+write.csv(dat.figed4c, "data/source_figed4c.csv")
+
+dat.figed5f <- pred_is.dat.all
+write.csv(dat.figed5f, "data/source_figed5f.csv")
 
 ############################
 ######### ONE MODEL ########
